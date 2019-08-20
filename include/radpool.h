@@ -2,6 +2,7 @@
 #define __POOL_H__
 
 #include <stdint.h>
+#include <stddef.h>
 
 typedef void POOL;
 
