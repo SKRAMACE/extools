@@ -40,8 +40,8 @@
 #define ENVEX_HEX32(v,x,d) \
     v = (getenv(x)) ? (uint32_t)strtol(getenv(x), NULL, 16) : (uint32_t)d
 
-char *
-envex_str(char *dst, char *name, char *def)
+void
+envex_str(char *name, char *def, char **v)
 {
     char *s = calloc(1024, 1);
 
@@ -53,12 +53,11 @@ envex_str(char *dst, char *name, char *def)
     } else {
         *s = 0;
     }
-
-    return s;
+    *v = s;
 }
 
 #define ENVEX_TOSTR(v,x,d) \
-    envex_str(v,x,d)
+    envex_str(x,d,&v)
 
 #define ENVEX_EXISTS(x) \
     (getenv(x) ? 1 : 0)
