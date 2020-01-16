@@ -13,29 +13,34 @@
         return ENVEX_ERROR; \
     }
 
-#define ENVEX_TOINT(x) \
-    (getenv(x)) ? atoi(getenv(x)) : 0
+#define ENVEX_TOINT(v,x,d) \
+    v = (getenv(x)) ? atoi(getenv(x)) : d
 
-#define ENVEX_HEXINT(x) \
-    (getenv(x)) ? strtol(getenv(x), NULL, 16) : 0
+#define ENVEX_TOFLOAT(v,x,d) \
+    v = (getenv(x)) ? atof(getenv(x)) : (float)d
+
+#define ENVEX_HEXINT(v,x,d) \
+    v = (getenv(x)) ? strtol(getenv(x), NULL, 16) : d
 
 char *
-envex_str(char *name)
+envex_str(char *dst, char *name, char *def)
 {
-    char *x = getenv(name);
-
     char *s = calloc(1024, 1);
-    strncpy(s, x, 1023);
 
-    if (!x) {
+    char *x = getenv(name);
+    if (x) {
+        strncpy(s, x, 1023);
+    } else if (def) {
+        strncpy(s, def, 1023);
+    } else {
         *s = 0;
     }
 
     return s;
 }
 
-#define ENVEX_TOSTR(x) \
-    envex_str(x)
+#define ENVEX_TOSTR(v,x,d) \
+    envex_str(v,x,d)
 
 #define ENVEX_EXISTS(x) \
     (getenv(x) ? 1 : 0)
@@ -46,4 +51,4 @@ envex_str(char *name)
         return ENVEX_ERROR; \
     }
 
- #endif
+#endif
