@@ -40,24 +40,15 @@
 #define ENVEX_HEX32(v,x,d) \
     v = (getenv(x)) ? (uint32_t)strtol(getenv(x), NULL, 16) : (uint32_t)d
 
-void
-envex_str(char *name, char *def, char **v)
-{
-    char *s = calloc(1024, 1);
-
-    char *x = getenv(name);
-    if (x) {
-        strncpy(s, x, 1023);
-    } else if (def) {
-        strncpy(s, def, 1023);
-    } else {
-        *s = 0;
-    }
-    *v = s;
-}
-
 #define ENVEX_TOSTR(v,x,d) \
-    envex_str(x,d,&v)
+    {*(char **)&v = calloc(1024, 1); \
+    if (getenv(x)) { \
+        strncpy(v, getenv(x), 1023); \
+    } else if (d) { \
+        strncpy(v, d, 1023); \
+    } else { \
+        *v = 0; \
+    }}
 
 #define ENVEX_EXISTS(x) \
     (getenv(x) ? 1 : 0)
