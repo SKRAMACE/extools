@@ -50,6 +50,22 @@
         *v = 0; \
     }}
 
+#define ENVEX_TOSTR_LOWER(v,x,d) \
+    ENVEX_TOSTR(v,x,d) \
+    {unsigned char *p = (unsigned char *)v; \
+    while (*p) { \
+        if (*p > 0x40 && *p < 0x5B) { *p = *p + 0x20; } \
+        p++; \
+    }}
+
+#define ENVEX_TOSTR_UPPER(v,x,d) \
+    ENVEX_TOSTR(v,x,d) \
+    {unsigned char *p = (unsigned char *)v; \
+    while (*p) { \
+        if (*p > 0x60 && *p < 0x7B) { *p = *p - 0x20; } \
+        p++; \
+    }}
+
 #define ENVEX_EXISTS(x) \
     (getenv(x) ? 1 : 0)
 
