@@ -273,6 +273,9 @@ pfree_sub(POOL *pool)
 void
 pfree(POOL *pool)
 {
+    if (!pool) {
+        return;
+    }
     unlink_pool(pool);
     pfree_sub(pool);
 }
