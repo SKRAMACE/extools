@@ -40,6 +40,15 @@
 #define ENVEX_HEX32(v,x,d) \
     v = (getenv(x)) ? (uint32_t)strtol(getenv(x), NULL, 16) : (uint32_t)d
 
+#define ENVEX_COPY(v,b,x,d) \
+    if (getenv(x)) { \
+        strncpy(v, getenv(x), b); \
+    } else if (d) { \
+        strncpy(v, d, b); \
+    } else { \
+        *v = 0; \
+    }
+
 #define ENVEX_TOSTR(v,x,d) \
     {*(char **)&v = calloc(1024, 1); \
     if (getenv(x)) { \
