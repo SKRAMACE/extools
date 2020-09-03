@@ -1,5 +1,5 @@
 /*
- *   radpool is a simple memory pool hierarchy designed to simplify memory
+ *   memex pool is a simple memory pool hierarchy designed to simplify memory
  *   management in buffer-heavy software
  *
  *   Copyright (C) 2017 SKRAMACE
@@ -34,24 +34,24 @@ struct alloc_info {
 };
 
 // Implementation struct
-static struct radpool_t {
+static struct memex_pool_t {
     struct alloc_info *allocs;
     uint32_t alloc_space;
     uint32_t alloc_count;
-    struct radpool_t **pools;
+    struct memex_pool_t **pools;
     uint32_t pool_space;
     uint32_t pool_count;
-    struct radpool_t *super_pool;
+    struct memex_pool_t *super_pool;
 } *master_pool = NULL;
 
 static void
 init_pool(POOL *pool)
 {
-    struct radpool_t *p = (struct radpool_t *)pool;
+    struct memex_pool_t *p = (struct memex_pool_t *)pool;
     p->allocs = malloc(RADPOOL_ALLOC_INCREMENT * sizeof(struct alloc_info));
     p->alloc_space = RADPOOL_ALLOC_INCREMENT;
     p->alloc_count = 0;
-    p->pools = malloc(RADPOOL_ALLOC_INCREMENT * sizeof(struct radpool_t*));
+    p->pools = malloc(RADPOOL_ALLOC_INCREMENT * sizeof(struct memex_pool_t*));
     p->pool_space = RADPOOL_ALLOC_INCREMENT;
     p->pool_count = 0;
     p->super_pool = NULL;
@@ -63,7 +63,7 @@ init_pool(POOL *pool)
 void *
 palloc(POOL *pool, size_t bytes)
 {
-    struct radpool_t *p = (struct radpool_t*)pool;
+    struct memex_pool_t *p = (struct memex_pool_t*)pool;
 
     if (!p) {
         return NULL;
@@ -106,7 +106,7 @@ pcalloc(POOL *pool, size_t bytes)
 void *
 repalloc(void *addr, size_t bytes, POOL *pool)
 {
-    struct radpool_t *p = (struct radpool_t *)pool;
+    struct memex_pool_t *p = (struct memex_pool_t *)pool;
     void *ret = NULL;
     
     if (!p) {
@@ -142,30 +142,30 @@ repalloc(void *addr, size_t bytes, POOL *pool)
 static void
 add_subpool(POOL *pool, POOL *sub)
 {
-    struct radpool_t *p = (struct radpool_t*)pool;
+    struct memex_pool_t *p = (struct memex_pool_t*)pool;
 
     // Resize the pools array, if necessary
     if (p->pool_space == p->pool_count) {
         uint32_t new_space = p->pool_space + RADPOOL_ALLOC_INCREMENT;
-        p->pools = realloc(p->pools, new_space * sizeof(struct radpool_t*));
+        p->pools = realloc(p->pools, new_space * sizeof(struct memex_pool_t*));
         p->pool_space = new_space;
     }
 
     // Create a new subpool and add to the pools array
-    p->pools[p->pool_count++] = (struct radpool_t*)sub;
-    ((struct radpool_t*)sub)->super_pool = p;
+    p->pools[p->pool_count++] = (struct memex_pool_t*)sub;
+    ((struct memex_pool_t*)sub)->super_pool = p;
 }
 
 POOL *
 create_pool()
 {
     if (!master_pool) {
-        master_pool = malloc(sizeof(struct radpool_t));
+        master_pool = malloc(sizeof(struct memex_pool_t));
         init_pool(master_pool);
     }
 
     // Every pool is a sub of the master pool
-    struct radpool_t *p = malloc(sizeof(struct radpool_t));
+    struct memex_pool_t *p = malloc(sizeof(struct memex_pool_t));
     init_pool(p);
 
     add_subpool(master_pool, p);
@@ -178,10 +178,10 @@ POOL *
 create_subpool(POOL *pool)
 {
     // Cast to implementation struct
-    struct radpool_t *p = (struct radpool_t*)pool;
+    struct memex_pool_t *p = (struct memex_pool_t*)pool;
 
     // Create a new subpool and add to the pools array
-    struct radpool_t *sub = malloc(sizeof(struct radpool_t));
+    struct memex_pool_t *sub = malloc(sizeof(struct memex_pool_t));
     init_pool(sub);
 
     add_subpool(p, sub);
@@ -193,7 +193,7 @@ POOL *
 copy_pool(POOL *pool)
 {
     int i;
-    struct radpool_t *p = (struct radpool_t*)pool;
+    struct memex_pool_t *p = (struct memex_pool_t*)pool;
 
     POOL *new = create_pool();
 
@@ -213,7 +213,7 @@ copy_pool(POOL *pool)
 
 static void
 unlink_pool(POOL *pool) {
-    struct radpool_t *p = (struct radpool_t*)pool;
+    struct memex_pool_t *p = (struct memex_pool_t*)pool;
 
     // If no parent, there's no need to unlink
     if (!p->super_pool) {
@@ -221,7 +221,7 @@ unlink_pool(POOL *pool) {
     }
 
     // Get parent
-    struct radpool_t *parent = p->super_pool;
+    struct memex_pool_t *parent = p->super_pool;
 
     // Find this pool in it's parent's pool list
     uint32_t i, j;
@@ -245,7 +245,7 @@ unlink_pool(POOL *pool) {
 
 // Free allocations in pool
 static inline void
-pfree_allocs(struct radpool_t *p)
+pfree_allocs(struct memex_pool_t *p)
 {
     uint32_t i;
     for (i = 0; i < p->alloc_count; i++) {
@@ -259,7 +259,7 @@ pfree_allocs(struct radpool_t *p)
 static void
 pfree_sub(POOL *pool)
 {
-    struct radpool_t *p = (struct radpool_t*)pool;
+    struct memex_pool_t *p = (struct memex_pool_t*)pool;
 
     uint32_t i;
     for (i = 0; i < p->pool_count; i++) {

@@ -6,10 +6,10 @@ INSTALLATION:
 
 USAGE:
     // C Source file
-    #include <radpool.h>
+    #include <memex.h>
 
     # Makefile
-    -lradpool
+    -lmemex
 
 API:
     // Create a new top-level pool
