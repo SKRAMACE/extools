@@ -23,7 +23,7 @@
 #include <string.h>
 #include <inttypes.h>
 
-#include "radpool.h"
+#include "memex.h"
 
 #define RADPOOL_ALLOC_INCREMENT 0x10
 

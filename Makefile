@@ -2,8 +2,8 @@
 BUILD_CONFIG=x86_64.gcc
 include tools.mk
 
-HDR = radpool.h
-LIB = libradpool
+HDR = memex.h
+LIB = libmemex
 VERSION = 1.0.0
 SO_VERSION = 0
 LIBFILE = $(LIB).so.$(VERSION)
@@ -35,8 +35,9 @@ endif
 .IGNORE: clean
 .PHONY: install clean uninstall
 
-SRC = \
-	radpool.c
+SRC=\
+	pool.c \
+	cleanup.c
 
 $(LIB): $(SRC)
 	$(CC) $^ $(INC) $(LDFLAGS) $(CFLAGS) -o $(LIB)
