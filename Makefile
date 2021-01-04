@@ -36,6 +36,7 @@ endif
 .PHONY: install clean uninstall
 
 SRC=\
+    memex-log.c \
 	pool.c \
 	cleanup.c
 

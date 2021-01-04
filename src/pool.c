@@ -24,6 +24,7 @@
 #include <inttypes.h>
 
 #include "memex.h"
+#include "memex-log.h"
 
 #define RADPOOL_ALLOC_INCREMENT 0x10
 
@@ -48,13 +49,17 @@ static void
 init_pool(POOL *pool)
 {
     struct memex_pool_t *p = (struct memex_pool_t *)pool;
-    p->allocs = malloc(RADPOOL_ALLOC_INCREMENT * sizeof(struct alloc_info));
+    p->super_pool = NULL;
     p->alloc_space = RADPOOL_ALLOC_INCREMENT;
     p->alloc_count = 0;
-    p->pools = malloc(RADPOOL_ALLOC_INCREMENT * sizeof(struct memex_pool_t*));
     p->pool_space = RADPOOL_ALLOC_INCREMENT;
     p->pool_count = 0;
-    p->super_pool = NULL;
+
+    p->allocs = malloc(RADPOOL_ALLOC_INCREMENT * sizeof(struct alloc_info));
+    trace("%p:  Buf alloc (%p)", pool, p->allocs);
+
+    p->pools = malloc(RADPOOL_ALLOC_INCREMENT * sizeof(struct memex_pool_t*));
+    trace("%p:  Buf alloc (%p)", pool, p->pools);
 }
 
 /*
@@ -66,18 +71,25 @@ palloc(POOL *pool, size_t bytes)
     struct memex_pool_t *p = (struct memex_pool_t*)pool;
 
     if (!p) {
+        error("Null pool pointer");
         return NULL;
     }
 
     // Resize the allocs array, if necessary
     if (p->alloc_space == p->alloc_count) {
         uint32_t new_space = p->alloc_space + RADPOOL_ALLOC_INCREMENT;
-        p->allocs = realloc(p->allocs, new_space * sizeof(struct alloc_info));
+
+        void *a = realloc(p->allocs, new_space * sizeof(struct alloc_info));
+        trace("%p:  Buf realloc (%p -> %p)", p, p->allocs, a);
+        p->allocs = a;
+
         p->alloc_space = new_space;
     }
 
     // Call malloc and add pointer to allocs array
     void *addr = malloc(bytes);
+    trace("%p: Data alloc (%p)", pool, addr);
+
     struct alloc_info *info = p->allocs + p->alloc_count++;
     info->addr = addr;
     info->len = bytes;
@@ -110,6 +122,7 @@ repalloc(void *addr, size_t bytes, POOL *pool)
     void *ret = NULL;
     
     if (!p) {
+        error("Null pool pointer");
         return NULL;
     }
 
@@ -122,6 +135,7 @@ repalloc(void *addr, size_t bytes, POOL *pool)
     for (i = 0; i < p->alloc_count; i++) {
         if (p->allocs[i].addr == addr) {
             void *re = p->allocs[i].addr;
+            error("Reallocating from %zd to %zd bytes", p->allocs[i].len, bytes);
             re = realloc(re, bytes);
             p->allocs[i].addr = re;
             p->allocs[i].len = bytes;
@@ -146,8 +160,13 @@ add_subpool(POOL *pool, POOL *sub)
 
     // Resize the pools array, if necessary
     if (p->pool_space == p->pool_count) {
+        trace("Expanding pool tracking buffer");
         uint32_t new_space = p->pool_space + RADPOOL_ALLOC_INCREMENT;
-        p->pools = realloc(p->pools, new_space * sizeof(struct memex_pool_t*));
+
+        void *a = realloc(p->pools, new_space * sizeof(struct memex_pool_t*));
+        trace("%p:  Buf realloc (%p -> %p)", p, p->pools, a);
+        p->pools = a;
+
         p->pool_space = new_space;
     }
 
@@ -160,12 +179,14 @@ POOL *
 create_pool()
 {
     if (!master_pool) {
+        info("Allocating master pool");
         master_pool = malloc(sizeof(struct memex_pool_t));
         init_pool(master_pool);
     }
 
     // Every pool is a sub of the master pool
     struct memex_pool_t *p = malloc(sizeof(struct memex_pool_t));
+    trace("%p:  Buf alloc (%p)", p, p);
     init_pool(p);
 
     add_subpool(master_pool, p);
@@ -182,8 +203,9 @@ create_subpool(POOL *pool)
 
     // Create a new subpool and add to the pools array
     struct memex_pool_t *sub = malloc(sizeof(struct memex_pool_t));
+    info("%p: Creating sub pool %p", pool, sub);
+    trace("%p:  Buf alloc (%p)", sub, sub);
     init_pool(sub);
-
     add_subpool(p, sub);
 
     return (POOL *)sub;
@@ -192,6 +214,8 @@ create_subpool(POOL *pool)
 POOL *
 copy_pool(POOL *pool)
 {
+    info("%p: Copying", pool);
+
     int i;
     struct memex_pool_t *p = (struct memex_pool_t*)pool;
 
@@ -213,6 +237,8 @@ copy_pool(POOL *pool)
 
 static void
 unlink_pool(POOL *pool) {
+    info("%p: Unlink", pool);
+
     struct memex_pool_t *p = (struct memex_pool_t*)pool;
 
     // If no parent, there's no need to unlink
@@ -250,8 +276,11 @@ pfree_allocs(struct memex_pool_t *p)
     uint32_t i;
     for (i = 0; i < p->alloc_count; i++) {
         struct alloc_info *info = p->allocs + i;
+        trace("%p: Data free (%p)", p, info->addr);
         free(info->addr);
     }
+
+    trace("%p:  Buf free (%p)", p, p->allocs);
     free(p->allocs);
 }
 
@@ -259,6 +288,7 @@ pfree_allocs(struct memex_pool_t *p)
 static void
 pfree_sub(POOL *pool)
 {
+    info("%p: Free", pool);
     struct memex_pool_t *p = (struct memex_pool_t*)pool;
 
     uint32_t i;
@@ -266,7 +296,11 @@ pfree_sub(POOL *pool)
         pfree_sub((POOL *)p->pools[i]);
     }
     pfree_allocs(p);
+
+    trace("%p:  Buf free (%p)", p, p->pools);
     free(p->pools);
+
+    trace("%p:  Buf free (%p)", p, p);
     free(p);
 }
 
@@ -283,5 +317,11 @@ pfree(POOL *pool)
 void
 pool_cleanup()
 {
+    info("Freeing master pool");
     pfree(master_pool);
+}
+
+void memex_set_log_level(char *level)
+{
+    memex_set_log_level_str(level);
 }

@@ -23,4 +23,6 @@ void memex_cleanup_init();
 void memex_cleanup();
 void memex_cleanup_push(memex_cleanup_fn);
 
+void memex_set_log_level(char *level);
+
 #endif
