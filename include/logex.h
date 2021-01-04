@@ -9,9 +9,13 @@ If the source contains the main() function, use this:
 Otherwise, use this:
 #define LOGEX_STD
 
+For a library build, use this:
+#define LOGEX_LIB
+
 The following include directives are equivalent to the above defines:
 #include <logex-main.h>
 #include <logex-std.h>
+#include <logex-lib.h>
 
 The following OPTIONAL defines add extra functionality
 #define LOGEX_TAG ""
@@ -126,6 +130,10 @@ enum logging_level_e {
     #define set_log_level(x) _logex_logger.level = x; _set_global_default(x)
 #elif   defined(LOGEX_STD)
     extern int _logex_global_default;
+    #define set_log_level_str(x) LEVEL_STRING_TO_ENUM(x)
+    #define set_log_level(x) _logex_logger.level = x;
+#elif   defined(LOGEX_LIB)
+    static int _logex_global_default = ERROR;
     #define set_log_level_str(x) LEVEL_STRING_TO_ENUM(x)
     #define set_log_level(x) _logex_logger.level = x;
 #else
