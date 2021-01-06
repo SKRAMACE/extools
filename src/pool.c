@@ -135,7 +135,7 @@ repalloc(void *addr, size_t bytes, POOL *pool)
     for (i = 0; i < p->alloc_count; i++) {
         if (p->allocs[i].addr == addr) {
             void *re = p->allocs[i].addr;
-            error("Reallocating from %zd to %zd bytes", p->allocs[i].len, bytes);
+            trace("Reallocating from %zd to %zd bytes", p->allocs[i].len, bytes);
             re = realloc(re, bytes);
             p->allocs[i].addr = re;
             p->allocs[i].len = bytes;
