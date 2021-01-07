@@ -22,11 +22,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
+#include <envex.h>
 
 #include "memex.h"
 #include "memex-log.h"
 
 #define RADPOOL_ALLOC_INCREMENT 0x10
+
+static int memex_logging_init = 0;
 
 // Struct for keeping track of memory allocations
 struct alloc_info {
@@ -178,6 +181,12 @@ add_subpool(POOL *pool, POOL *sub)
 POOL *
 create_pool()
 {
+    if (memex_logging_init == 0 && ENVEX_EXISTS("MEMEX_LOG_LEVEL")) {
+        char lvl[32];
+        ENVEX_COPY(lvl, 32, "MEMEX_LOG_LEVEL", "");
+        memex_set_log_level(lvl);
+    }
+
     if (!master_pool) {
         info("Allocating master pool");
         master_pool = malloc(sizeof(struct memex_pool_t));
@@ -324,4 +333,5 @@ pool_cleanup()
 void memex_set_log_level(char *level)
 {
     memex_set_log_level_str(level);
+    memex_logging_init = 1;
 }
