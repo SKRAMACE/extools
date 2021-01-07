@@ -41,10 +41,11 @@
     v = (getenv(x)) ? (uint32_t)strtol(getenv(x), NULL, 16) : (uint32_t)d
 
 #define ENVEX_COPY(v,b,x,d) \
+    v[b-1] = 0; \
     if (getenv(x)) { \
-        strncpy(v, getenv(x), b); \
+        strncpy(v, getenv(x), b-1); \
     } else if (d) { \
-        strncpy(v, d, b); \
+        strncpy(v, d, b-1); \
     } else { \
         *v = 0; \
     }
