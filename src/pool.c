@@ -27,7 +27,7 @@
 #include "memex.h"
 #include "memex-log.h"
 
-#define RADPOOL_ALLOC_INCREMENT 0x10
+#define RADPOOL_ALLOC_INCREMENT 0x80
 
 static int memex_logging_init = 0;
 
@@ -285,8 +285,10 @@ pfree_allocs(struct memex_pool_t *p)
     uint32_t i;
     for (i = 0; i < p->alloc_count; i++) {
         struct alloc_info *info = p->allocs + i;
-        trace("%p: Data free (%p)", p, info->addr);
-        free(info->addr);
+        if (info->addr) {
+            trace("%p: Data free (%p)", p, info->addr);
+            free(info->addr);
+        }
     }
 
     trace("%p:  Buf free (%p)", p, p->allocs);
@@ -314,7 +316,26 @@ pfree_sub(POOL *pool)
 }
 
 void
-pfree(POOL *pool)
+pfree(POOL *pool, void *addr)
+{
+    struct memex_pool_t *p = (struct memex_pool_t*)pool;
+
+    uint32_t i;
+    for (i = 0; i < p->alloc_count; i++) {
+        struct alloc_info *info = p->allocs + i;
+        if (info->addr != addr) {
+            continue;
+        }
+
+        trace("%p: Data free (%p)", p, info->addr);
+        free(info->addr);
+        info->addr = NULL;
+        info->len = 0;
+    }
+}
+
+void
+free_pool(POOL *pool)
 {
     if (!pool) {
         return;
@@ -327,7 +348,7 @@ void
 pool_cleanup()
 {
     info("Freeing master pool");
-    pfree(master_pool);
+    free_pool(master_pool);
 }
 
 void memex_set_log_level(char *level)

@@ -13,8 +13,9 @@ POOL *copy_pool(POOL *pool);
 void *palloc(POOL *pool, size_t bytes);
 void *pcalloc(POOL *pool, size_t bytes);
 void *repalloc(void *addr, size_t bytes, POOL *pool);
-void pfree(POOL *pool);
+void free_pool(POOL *pool);
 void pool_cleanup();
+void pfree(POOL *pool, void *addr);
 
 // Auto Cleanup
 typedef void (*memex_cleanup_fn)(void);
