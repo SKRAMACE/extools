@@ -5,14 +5,13 @@ strncpy_upper(char *dst, int n, char *src)
     unsigned char *b = (unsigned char *)dst;
 
     int c = 0;
-    while (*a && (c++ < n)) {
-        if (*a > 0x60 && *a < 0x7B) {
-            *b = *a - 0x20;
+    while (a[c] && (c < n-1)) {
+        if (a[c] > 0x60 && a[c] < 0x7B) {
+            b[c] = a[c] - 0x20;
         } else {
-            *b = *a;
+            b[c] = a[c];
         }
-        a++;
-        b++;
+        c++;
     }
-    dst[n-1] = 0;
+    b[c] = 0;
 }
