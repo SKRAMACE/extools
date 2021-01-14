@@ -196,6 +196,39 @@ _logex_gen_timestamp(char *timestamp, size_t bytes)
 }
 
 static void
+_logex_log_print(int level, const char *lvl_str, const char *fmt, ...)
+{
+    _logex_gen_timestamp(_logex_timestamp, LOGEX_TIMESTAMP_LEN);
+
+    va_list args;
+    va_start(args, fmt);
+
+    if (_logex_logger.fname[0]) {
+        FILE *f = fopen(_logex_logger.fname, "a+");
+        fprintf(f, "%s [%s] ", _logex_timestamp, lvl_str);
+        if (_logex_logger.tag) {
+            fprintf(f, "%s: ", _logex_logger.tag);
+        }
+        vfprintf(f, fmt, args);
+        fprintf(f, "\n");
+        fclose(f);
+    }
+
+    if (_logex_logger.console) {
+        fprintf(stdout, "%s [%s%s%s] ", _logex_timestamp,
+            LEVEL_COLOR(level), lvl_str, LEVEL_COLOR(RESET));
+        if (_logex_logger.tag) {
+            fprintf(stdout, "%s: ", _logex_logger.tag);
+        }
+        vfprintf(stdout, fmt, args);
+        fprintf(stdout, "\n");
+        fflush(stdout);
+    }
+
+    va_end(args);
+}
+
+static void
 _logex_log(int level, const char *lvl_str, const char *fmt, ...)
 {
     int cur_level = LOG_LEVEL;
@@ -232,4 +265,5 @@ _logex_log(int level, const char *lvl_str, const char *fmt, ...)
 
     va_end(args);
 }
+
 #endif      // ifndef (everything above this is only included once
