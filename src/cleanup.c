@@ -25,6 +25,7 @@
 #include "memex.h"
 
 #define MAX_CLEANUP_FN 10
+static int cleanup_called = 0;
 static int n_cleanup_fn = 0;
 static memex_cleanup_fn fn[MAX_CLEANUP_FN];
 
@@ -41,15 +42,26 @@ memex_cleanup_push(memex_cleanup_fn new_fn)
 void
 memex_cleanup()
 {
+    if (cleanup_called) {
+        return;
+    }
+    cleanup_called = 1;
     int i = n_cleanup_fn - 1;
     for (; i >= 0; i--) {
         fn[i]();
     }
 }
 
+static void
+memex_cleanup_and_exit()
+{
+    memex_cleanup();
+    exit(0);
+}
+
 void
 memex_cleanup_init()
 {
     // Register cleanup function
-    signal(SIGINT, memex_cleanup);
+    signal(SIGINT, memex_cleanup_and_exit);
 }
