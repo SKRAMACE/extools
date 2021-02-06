@@ -21,22 +21,52 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
+#include <envex.h>
 
 #include "memex.h"
 
+#define LOGEX_TAG "MEMEX-CLEAN"
+#include "memex-log.h"
+
 #define MAX_CLEANUP_FN 10
+
 static int cleanup_called = 0;
 static int n_cleanup_fn = 0;
-static memex_cleanup_fn fn[MAX_CLEANUP_FN];
 
-void
-memex_cleanup_push(memex_cleanup_fn new_fn)
+static struct memex_t {
+    void *fn;
+    void *args;
+} stack[MAX_CLEANUP_FN];
+
+static void
+memex_cleanup_push_internal(void *fn, void *args)
 {
+    if (memex_logging_init == 0 && ENVEX_EXISTS("MEMEX_CLEANUP_LOG_LEVEL")) {
+        char lvl[32];
+        ENVEX_COPY(lvl, 32, "MEMEX_CLEANUP_LOG_LEVEL", "");
+        memex_cleanup_set_log_level(lvl);
+    }
+
     if (n_cleanup_fn >= MAX_CLEANUP_FN) {
-        printf("ERROR: Max cleanup functions reached\n");
+        error("Max cleanup functions reached");
         return;
     }
-    fn[n_cleanup_fn++] = new_fn;
+
+    int n = n_cleanup_fn++;
+    stack[n].fn = fn;
+    stack[n].args = args;
+}
+
+void
+memex_cleanup_push(memex_cleanup_fn fn)
+{
+    memex_cleanup_push_internal(fn, NULL);
+}
+
+void
+memex_cleanup_push_args(memex_cleanup_args_fn fn, void *args)
+{
+    memex_cleanup_push_internal(fn, args);
 }
 
 void
@@ -46,9 +76,16 @@ memex_cleanup()
         return;
     }
     cleanup_called = 1;
+
     int i = n_cleanup_fn - 1;
     for (; i >= 0; i--) {
-        fn[i]();
+        if (stack[i].args) {
+            memex_cleanup_args_fn fn = (memex_cleanup_args_fn)stack[i].fn;
+            fn(stack[i].args);
+        } else {
+            memex_cleanup_fn fn = (memex_cleanup_fn)stack[i].fn;
+            fn();
+        }
     }
 }
 
@@ -64,4 +101,10 @@ memex_cleanup_init()
 {
     // Register cleanup function
     signal(SIGINT, memex_cleanup_and_exit);
+}
+
+void
+memex_cleanup_set_log_level(char *level)
+{
+    memex_set_log_level_str(level);
 }

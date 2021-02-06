@@ -38,6 +38,7 @@ endif
 SRC=\
     memex-log.c \
 	pool.c \
+	list.c \
 	cleanup.c
 
 $(LIB): $(SRC)
