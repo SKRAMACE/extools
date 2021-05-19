@@ -229,6 +229,12 @@ _logex_log_print(int level, const char *lvl_str, const char *fmt, ...)
 }
 
 static void
+_logex_log_print_lvl(const char *str)
+{
+    _logex_log_print(INFO, "LOGEX", "%s=%s%s%s", str, LEVEL_COLOR(LOG_LEVEL), LOG_LEVEL_STR, LEVEL_COLOR(RESET));
+}
+
+static void
 _logex_log(int level, const char *lvl_str, const char *fmt, ...)
 {
     int cur_level = LOG_LEVEL;
