@@ -41,6 +41,7 @@ The following OPTIONAL defines add extra functionality
 enum logging_level_e {
     DEFAULT=101,
     RESET=100,
+    LOGEX=99,
     FATAL=90,
     CRITICAL=80,
     ERROR=70,
@@ -53,6 +54,7 @@ enum logging_level_e {
 };
 
 #define LEVEL_COLOR(x) \
+    (x == LOGEX) ? "\e[94m" : \
     (x == FATAL) ? "\e[41;97m" : \
     (x == CRITICAL) ? "\e[41;97m" : \
     (x == ERROR) ? "\e[1;31m" : \
@@ -65,6 +67,7 @@ enum logging_level_e {
     "\e[0m"
 
 #define LEVEL_STRING(x) \
+    (x == LOGEX) ? "LOGEX" : \
     (x == FATAL) ? "FATAL" : \
     (x == CRITICAL) ? "CRITICAL" : \
     (x == ERROR) ? "ERROR" : \
@@ -87,6 +90,7 @@ enum logging_level_e {
         s[i] = toupper(c); \
     } \
     _logex_logger.level = \
+    (0 == strncmp(s, "LOGEX", 5)) ? LOGEX : \
     (0 == strncmp(s, "FATAL", 5)) ? FATAL : \
     (0 == strncmp(s, "CRITICAL", 8)) ? CRITICAL : \
     (0 == strncmp(s, "ERROR", 5)) ? ERROR : \
@@ -104,6 +108,7 @@ enum logging_level_e {
 #define _LOG(lvl, s, ...) _logex_log(lvl, #lvl, s, ##__VA_ARGS__)
 
 // LOGGING CALLS
+#define logex(s, ...) _LOG(LOGEX, s, ##__VA_ARGS__)
 #define fatal(s, ...) _LOG(FATAL, s, ##__VA_ARGS__)
 #define critical(s, ...) _LOG(CRITICAL, s, ##__VA_ARGS__)
 #define error(s, ...) _LOG(ERROR, s, ##__VA_ARGS__)
@@ -231,7 +236,7 @@ _logex_log_print(int level, const char *lvl_str, const char *fmt, ...)
 static void
 _logex_log_print_lvl(const char *str)
 {
-    _logex_log_print(INFO, "LOGEX", "%s=%s%s%s", str, LEVEL_COLOR(LOG_LEVEL), LOG_LEVEL_STR, LEVEL_COLOR(RESET));
+    _logex_log_print(LOGEX, "LOGEX", "%s=%s%s%s", str, LEVEL_COLOR(LOG_LEVEL), LOG_LEVEL_STR, LEVEL_COLOR(RESET));
 }
 
 static void
