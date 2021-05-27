@@ -44,6 +44,9 @@ SRC=\
 $(LIB): $(SRC)
 	$(CC) $^ $(INC) $(LDFLAGS) $(CFLAGS) -o $(LIB)
 
+test: test.c $(SRC)
+	$(CC) $^ -ggdb $(INC) -o memex-test
+
 install: $(LIB)
 	install -m 0755 $(LIB) -D $(DESTDIR)$(libdir)/$(LIBFILE)
 	cd $(DESTDIR)$(libdir); \
