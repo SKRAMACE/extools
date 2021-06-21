@@ -39,6 +39,7 @@ SRC=\
     memex-log.c \
 	pool.c \
 	list.c \
+	sort.c \
 	cleanup.c
 
 $(LIB): $(SRC)

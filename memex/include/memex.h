@@ -29,11 +29,31 @@ void memex_cleanup_push_args(memex_cleanup_args_fn fn, void *args);
 // Lists
 typedef void MLIST;
 
+#define memex_list_sort(list, _STRUCT_, _MEMBER_)\
+{\
+    uint32_t N; \
+    _STRUCT_ *E = memex_list_get_entries_copy(list, &N); \
+    size_t bytes = N * sizeof(_STRUCT_); \
+    struct memex_sort_t *_sort = malloc(N * sizeof(struct memex_sort_t)); \
+    for (int n = 0; n < N; n++) { \
+        _sort[n].ptr = E + n; \
+        _sort[n].val = (double)E[n]._MEMBER_; \
+    } \
+    memex_merge_sort(_sort, N); \
+    for (int n = 0; n < N; n++) { \
+        memcpy(entries + n, _sort[n].ptr, sizeof(_STRUCT_)); \
+    } \
+    POOL *p = memex_list_get_pool(list); \
+    pfree(p, E); \
+}
+
 MLIST *memex_list_create(POOL *pool, const size_t entry_size);
 void *memex_list_new_entry(MLIST *list);
 void *memex_list_get_entries(MLIST *list, uint32_t *n_entries);
+void *memex_list_get_entries_copy(MLIST *list, uint32_t *n_entries);
 void memex_list_set_step_size(MLIST *list, size_t size);
 void memex_list_destroy(MLIST *list);
+POOL *memex_list_get_pool(MLIST *list);
 
 void memex_list_set_default_step_size(size_t size);
 
@@ -41,5 +61,12 @@ void memex_list_set_default_step_size(size_t size);
 void memex_pool_set_log_level(char *level);
 void memex_cleanup_set_log_level(char *level);
 void memex_list_set_log_level(char *level);
+
+// Sort
+struct memex_sort_t {
+    void *ptr;
+    double val;
+};
+void memex_merge_sort(struct memex_sort_t *list, int len);
 
 #endif

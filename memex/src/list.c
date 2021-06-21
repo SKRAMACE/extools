@@ -69,6 +69,24 @@ memex_list_get_entries(MLIST *list, uint32_t *n_entries)
     return m->entries;
 }
 
+void *
+memex_list_get_entries_copy(MLIST *list, uint32_t *n_entries)
+{
+    // Dereference input pointer
+    if (!list) {
+        error("Invalid MLIST");
+        return NULL;
+    }
+    struct memex_list_t *m = (struct memex_list_t *)list;
+
+    size_t bytes = m->entry_size * m->n_entry;
+    void *copy = pcalloc(m->pool, bytes);
+    memcpy(copy, m->entries, bytes);
+
+    *n_entries = m->n_entry;
+    return copy;
+}
+
 MLIST *
 memex_list_create(POOL *pool, const size_t entry_size)
 {
@@ -87,6 +105,18 @@ memex_list_create(POOL *pool, const size_t entry_size)
     trace("%p: created", m);
 
     return (MLIST *)m;
+}
+
+POOL *
+memex_list_get_pool(MLIST *list) {
+    // Dereference input pointer
+    if (!list) {
+        error("Invalid MLIST");
+        return NULL;
+    }
+
+    struct memex_list_t *m = (struct memex_list_t *)list;
+    return m->pool;
 }
 
 void
