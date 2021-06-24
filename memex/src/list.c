@@ -52,6 +52,7 @@ memex_list_new_entry(MLIST *list)
 
     char *addr = (char *)m->entries;
     char *entry = addr + (i * m->entry_size);
+    memset(entry, 0, m->entry_size);
     return (void *)entry;
 }
 
