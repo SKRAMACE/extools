@@ -61,6 +61,7 @@ memex_list_get_entries(MLIST *list, uint32_t *n_entries)
     // Dereference input pointer
     if (!list) {
         error("Invalid MLIST");
+        *n_entries = 0;
         return NULL;
     }
     struct memex_list_t *m = (struct memex_list_t *)list;
@@ -74,6 +75,7 @@ memex_list_get_entries_copy(MLIST *list, uint32_t *n_entries)
 {
     // Dereference input pointer
     if (!list) {
+        *n_entries = 0;
         error("Invalid MLIST");
         return NULL;
     }
