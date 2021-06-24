@@ -32,19 +32,20 @@ typedef void MLIST;
 #define memex_list_sort(list, _STRUCT_, _MEMBER_)\
 {\
     uint32_t N; \
-    _STRUCT_ *E = memex_list_get_entries_copy(list, &N); \
+    _STRUCT_ *copy = memex_list_get_entries_copy(list, &N); \
     size_t bytes = N * sizeof(_STRUCT_); \
     struct memex_sort_t *_sort = malloc(N * sizeof(struct memex_sort_t)); \
     for (int n = 0; n < N; n++) { \
-        _sort[n].ptr = E + n; \
-        _sort[n].val = (double)E[n]._MEMBER_; \
+        _sort[n].ptr = copy + n; \
+        _sort[n].val = (double)copy[n]._MEMBER_; \
     } \
     memex_merge_sort(_sort, N); \
+    _STRUCT_ *E = memex_list_get_entries(list, &N); \
     for (int n = 0; n < N; n++) { \
-        memcpy(entries + n, _sort[n].ptr, sizeof(_STRUCT_)); \
+        memcpy(E + n, _sort[n].ptr, sizeof(_STRUCT_)); \
     } \
     POOL *p = memex_list_get_pool(list); \
-    pfree(p, E); \
+    pfree(p, copy); \
 }
 
 MLIST *memex_list_create(POOL *pool, const size_t entry_size);

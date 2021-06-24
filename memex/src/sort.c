@@ -46,5 +46,6 @@ memex_merge_sort(struct memex_sort_t *list, int len)
             alen--;
         }
     }
+
     free(copy);
 }
