@@ -3,9 +3,17 @@
 
 #include "memex.h"
 
+#define LOGEX_TAG "MEMEX-LIST"
+#include "memex-log.h"
+
 void
 memex_merge_sort(struct memex_sort_t *list, int len)
 {
+    if (len < 1) {
+        error("%s: Invalid list length (%d)", __FUNCTION__, len);
+        return;
+    }
+
     if (len == 1) {
         return;
     }
