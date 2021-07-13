@@ -10,7 +10,7 @@ void
 memex_merge_sort(struct memex_sort_t *list, int len)
 {
     if (len < 1) {
-        error("%s: Invalid list length (%d)", __FUNCTION__, len);
+        verbose("%s: Invalid list length (%d)", __FUNCTION__, len);
         return;
     }
 
