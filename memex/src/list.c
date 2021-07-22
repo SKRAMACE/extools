@@ -123,6 +123,19 @@ memex_list_get_pool(MLIST *list) {
 }
 
 void
+memex_list_clear(MLIST *list)
+{
+    // Dereference input pointer
+    if (!list) {
+        error("Invalid MLIST");
+        return;
+    }
+
+    struct memex_list_t *m = (struct memex_list_t *)list;
+    m->n_entry = 0;
+}
+
+void
 memex_list_destroy(MLIST *list)
 {
     // Dereference input pointer
