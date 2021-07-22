@@ -129,10 +129,35 @@ enum logging_level_e {
 #define log_file_clear() if (_logex_logger.fname[0]) { FILE *f = fopen(_logex_logger.fname, "w"); fclose(f); }
 
 #if defined(LOGEX_MAIN)
+    #define LEVEL_STRING_TO_ENUM_DEFAULT(x) { \
+        char s[9]; \
+        snprintf(s, 9, "%s", x); s[8] = 0; \
+        for (int i = 0; i < 9; i++) { \
+            int c = (int)s[i]; \
+            if (!c) { \
+                break; \
+            } \
+            s[i] = toupper(c); \
+        } \
+        _logex_global_default = \
+        (0 == strncmp(s, "LOGEX", 5)) ? LOGEX : \
+        (0 == strncmp(s, "FATAL", 5)) ? FATAL : \
+        (0 == strncmp(s, "CRITICAL", 8)) ? CRITICAL : \
+        (0 == strncmp(s, "ERROR", 5)) ? ERROR : \
+        (0 == strncmp(s, "WARN", 4)) ? WARNING : \
+        (0 == strncmp(s, "INFO", 4)) ? INFO : \
+        (0 == strncmp(s, "VERBOSE", 7)) ? VERBOSE : \
+        (0 == strncmp(s, "CMD", 3)) ? CMD : \
+        (0 == strncmp(s, "DEBUG", 5)) ? DEBUG : \
+        (0 == strncmp(s, "TRACE", 5)) ? TRACE : \
+        DEFAULT; \
+    }
+
     int _logex_global_default = ERROR;
-    #define _set_global_default(x) _logex_global_default = (x >= RESET) ? ERROR : x
-    #define set_log_level_str(x) LEVEL_STRING_TO_ENUM(x); _set_global_default(_logex_logger.level)
-    #define set_log_level(x) _logex_logger.level = x; _set_global_default(x)
+    #define set_log_level_default(x) _logex_global_default = (x >= RESET) ? ERROR : x
+    #define set_log_level_default_str(x) LEVEL_STRING_TO_ENUM_DEFAULT(x)
+    #define set_log_level_str(x) LEVEL_STRING_TO_ENUM(x)
+    #define set_log_level(x) _logex_logger.level = x
 #elif   defined(LOGEX_STD)
     extern int _logex_global_default;
     #define set_log_level_str(x) LEVEL_STRING_TO_ENUM(x)
