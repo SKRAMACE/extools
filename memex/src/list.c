@@ -35,7 +35,7 @@ memex_list_new_entry(MLIST *list)
 {
     // Dereference input pointer
     if (!list) {
-        error("Invalid MLIST");
+        error("%s: Invalid MLIST", __FUNCTION__);
         return NULL;
     }
     struct memex_list_t *m = (struct memex_list_t *)list;
@@ -61,7 +61,7 @@ memex_list_get_entries(MLIST *list, uint32_t *n_entries)
 {
     // Dereference input pointer
     if (!list) {
-        error("Invalid MLIST");
+        error("%s: Invalid MLIST", __FUNCTION__);
         *n_entries = 0;
         return NULL;
     }
@@ -77,7 +77,7 @@ memex_list_get_entries_copy(MLIST *list, uint32_t *n_entries)
     // Dereference input pointer
     if (!list) {
         *n_entries = 0;
-        error("Invalid MLIST");
+        error("%s: Invalid MLIST", __FUNCTION__);
         return NULL;
     }
     struct memex_list_t *m = (struct memex_list_t *)list;
@@ -114,7 +114,7 @@ POOL *
 memex_list_get_pool(MLIST *list) {
     // Dereference input pointer
     if (!list) {
-        error("Invalid MLIST");
+        error("%s: Invalid MLIST", __FUNCTION__);
         return NULL;
     }
 
@@ -127,7 +127,7 @@ memex_list_clear(MLIST *list)
 {
     // Dereference input pointer
     if (!list) {
-        error("Invalid MLIST");
+        error("%s: Invalid MLIST", __FUNCTION__);
         return;
     }
 
@@ -140,7 +140,7 @@ memex_list_destroy(MLIST *list)
 {
     // Dereference input pointer
     if (!list) {
-        error("Invalid MLIST");
+        error("%s: Invalid MLIST", __FUNCTION__);
         return;
     }
 
