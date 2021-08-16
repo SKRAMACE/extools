@@ -19,6 +19,7 @@
  */
 
 #include <stdio.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
@@ -30,6 +31,10 @@
 #include "memex-log.h"
 
 #define RADPOOL_ALLOC_INCREMENT 0x80
+#define MEMEX_STATE_VALID 0x10001000
+#define MEMEX_STATE_FREED 0x10101010
+
+static pthread_mutex_t master_lock = PTHREAD_MUTEX_INITIALIZER;
 
 // Struct for keeping track of memory allocations
 struct alloc_info {
@@ -46,6 +51,8 @@ static struct memex_pool_t {
     uint32_t pool_space;
     uint32_t pool_count;
     struct memex_pool_t *super_pool;
+    pthread_mutex_t lock;
+    int state;
 } *master_pool = NULL;
 
 static void
@@ -57,12 +64,30 @@ init_pool(POOL *pool)
     p->alloc_count = 0;
     p->pool_space = RADPOOL_ALLOC_INCREMENT;
     p->pool_count = 0;
+    p->state = MEMEX_STATE_VALID;
 
     p->allocs = malloc(RADPOOL_ALLOC_INCREMENT * sizeof(struct alloc_info));
     trace("%p:  Buf alloc (%p)", pool, p->allocs);
 
     p->pools = malloc(RADPOOL_ALLOC_INCREMENT * sizeof(struct memex_pool_t*));
     trace("%p:  Buf alloc (%p)", pool, p->pools);
+
+    pthread_mutex_init(&p->lock, NULL);
+}
+
+static void
+init_master_pool()
+{
+    pthread_mutex_lock(&master_lock);
+    if (master_pool) {
+        pthread_mutex_unlock(&master_lock);
+        return;
+    }
+
+    info("Allocating master pool");
+    master_pool = malloc(sizeof(struct memex_pool_t));
+    init_pool(master_pool);
+    pthread_mutex_unlock(&master_lock);
 }
 
 /*
@@ -77,6 +102,14 @@ palloc(POOL *pool, size_t bytes)
         error("Null pool pointer");
         return NULL;
     }
+
+    if (p->state != MEMEX_STATE_VALID) {
+        if (p->state != MEMEX_STATE_FREED) {
+            error("%s:%d: Invalid Pool: (state = %d)", __FUNCTION__, __LINE__, p->state);
+        }
+        return NULL;
+    }
+    pthread_mutex_lock(&p->lock);
 
     // Resize the allocs array, if necessary
     if (p->alloc_space == p->alloc_count) {
@@ -96,6 +129,7 @@ palloc(POOL *pool, size_t bytes)
     struct alloc_info *info = p->allocs + p->alloc_count++;
     info->addr = addr;
     info->len = bytes;
+    pthread_mutex_unlock(&p->lock);
 
     // Return the allocated memory addr
     return addr;
@@ -133,6 +167,14 @@ repalloc(void *addr, size_t bytes, POOL *pool)
         return palloc(pool, bytes);
     }
 
+    if (p->state != MEMEX_STATE_VALID) {
+        if (p->state != MEMEX_STATE_FREED) {
+            error("%s:%d: Invalid Pool: (state = %d)", __FUNCTION__, __LINE__, p->state);
+        }
+        return NULL;
+    }
+    pthread_mutex_lock(&p->lock);
+
     uint32_t i;
     // Search pool for alloc addr
     for (i = 0; i < p->alloc_count; i++) {
@@ -142,7 +184,8 @@ repalloc(void *addr, size_t bytes, POOL *pool)
             re = realloc(re, bytes);
             p->allocs[i].addr = re;
             p->allocs[i].len = bytes;
-            return re;
+            ret = re;
+            goto do_return;
         }
     }
 
@@ -150,16 +193,20 @@ repalloc(void *addr, size_t bytes, POOL *pool)
     for (i = 0; i < p->pool_count; i++) {
         ret = repalloc(addr, bytes, p->pools[i]);
         if (ret) {
-            return ret;
+            goto do_return;
         }
     }
-    return NULL;
+
+do_return:
+    pthread_mutex_unlock(&p->lock);
+    return ret;
 }
 
 static void
 add_subpool(POOL *pool, POOL *sub)
 {
     struct memex_pool_t *p = (struct memex_pool_t*)pool;
+    pthread_mutex_lock(&p->lock);
 
     // Resize the pools array, if necessary
     if (p->pool_space == p->pool_count) {
@@ -176,11 +223,14 @@ add_subpool(POOL *pool, POOL *sub)
     // Create a new subpool and add to the pools array
     p->pools[p->pool_count++] = (struct memex_pool_t*)sub;
     ((struct memex_pool_t*)sub)->super_pool = p;
+
+    pthread_mutex_unlock(&p->lock);
 }
 
 POOL *
 create_pool()
 {
+    // Logging init
     if (memex_logging_init == 0 && ENVEX_EXISTS("MEMEX_POOL_LOG_LEVEL")) {
         char lvl[32];
         ENVEX_COPY(lvl, 32, "MEMEX_POOL_LOG_LEVEL", "");
@@ -188,16 +238,14 @@ create_pool()
     }
 
     if (!master_pool) {
-        info("Allocating master pool");
-        master_pool = malloc(sizeof(struct memex_pool_t));
-        init_pool(master_pool);
+        init_master_pool();
     }
 
-    // Every pool is a sub of the master pool
     struct memex_pool_t *p = malloc(sizeof(struct memex_pool_t));
     trace("%p:  Buf alloc (%p)", p, p);
     init_pool(p);
 
+    // Every pool is a sub of the master pool
     add_subpool(master_pool, p);
 
     // Cast to generic struct
@@ -215,6 +263,7 @@ create_subpool(POOL *pool)
     info("%p: Creating sub pool %p", pool, sub);
     trace("%p:  Buf alloc (%p)", sub, sub);
     init_pool(sub);
+
     add_subpool(p, sub);
 
     return (POOL *)sub;
@@ -230,6 +279,7 @@ copy_pool(POOL *pool)
 
     POOL *new = create_pool();
 
+    pthread_mutex_lock(&p->lock);
     for (i = 0; i < p->alloc_count; i++) {
         struct alloc_info *src = p->allocs + i;
         char *dst = palloc(new, src->len);
@@ -240,23 +290,36 @@ copy_pool(POOL *pool)
         POOL *sub = copy_pool((POOL*)p->pools[i]);
         add_subpool(new, sub);
     }
+    pthread_mutex_unlock(&p->lock);
 
     return new;
 }
 
-static void
+static POOL *
 unlink_pool(POOL *pool) {
-    info("%p: Unlink", pool);
-
     struct memex_pool_t *p = (struct memex_pool_t*)pool;
+    if (p->state != MEMEX_STATE_VALID) {
+        if (p->state != MEMEX_STATE_FREED) {
+            error("%s:%d: Invalid Pool: (state = %d)", __FUNCTION__, __LINE__, p->state);
+        }
+        return NULL;
+    }
+    pthread_mutex_lock(&p->lock);
 
     // If no parent, there's no need to unlink
     if (!p->super_pool) {
-        return;
+        goto no_parent;
     }
 
     // Get parent
     struct memex_pool_t *parent = p->super_pool;
+    if (parent->state != MEMEX_STATE_VALID) {
+        if (parent->state != MEMEX_STATE_FREED) {
+            error("%s:%d: Invalid Pool: (state = %d)", __FUNCTION__, __LINE__, parent->state);
+        }
+        goto no_parent;
+    }
+    pthread_mutex_lock(&parent->lock);
 
     // Find this pool in it's parent's pool list
     uint32_t i, j;
@@ -268,7 +331,7 @@ unlink_pool(POOL *pool) {
 
     // Pool not found in parent's pool list
     if (i == parent->pool_count) {
-        return;
+        goto do_return;
     }
 
     // Remove pool from parent pool list
@@ -276,6 +339,12 @@ unlink_pool(POOL *pool) {
     for (j = i; j < parent->pool_count; j++) {
         parent->pools[j] = parent->pools[j + 1];
     }
+
+do_return:
+    pthread_mutex_unlock(&parent->lock);
+
+no_parent:
+    pthread_mutex_unlock(&p->lock);
 }
 
 // Free allocations in pool
@@ -299,9 +368,20 @@ pfree_allocs(struct memex_pool_t *p)
 static void
 pfree_sub(POOL *pool)
 {
-    info("%p: Free", pool);
     struct memex_pool_t *p = (struct memex_pool_t*)pool;
+    if (p->state != MEMEX_STATE_VALID) {
+        if (p->state != MEMEX_STATE_FREED) {
+            error("%s:%d: Invalid Pool: (state = %d)", __FUNCTION__, __LINE__, p->state);
+        }
+        return;
+    }
 
+    pthread_mutex_lock(&p->lock);
+    p->state = MEMEX_STATE_FREED;
+    pthread_mutex_unlock(&p->lock);
+
+    pthread_mutex_lock(&p->lock);
+    info("%p: Free", pool);
     uint32_t i;
     for (i = 0; i < p->pool_count; i++) {
         pfree_sub((POOL *)p->pools[i]);
@@ -311,27 +391,11 @@ pfree_sub(POOL *pool)
     trace("%p:  Buf free (%p)", p, p->pools);
     free(p->pools);
 
+    pthread_mutex_unlock(&p->lock);
+    pthread_mutex_destroy(&p->lock);
+
     trace("%p:  Buf free (%p)", p, p);
     free(p);
-}
-
-void
-pfree(POOL *pool, void *addr)
-{
-    struct memex_pool_t *p = (struct memex_pool_t*)pool;
-
-    uint32_t i;
-    for (i = 0; i < p->alloc_count; i++) {
-        struct alloc_info *info = p->allocs + i;
-        if (info->addr != addr) {
-            continue;
-        }
-
-        trace("%p: Data free (%p)", p, info->addr);
-        free(info->addr);
-        info->addr = NULL;
-        info->len = 0;
-    }
 }
 
 void
@@ -347,8 +411,40 @@ free_pool(POOL *pool)
 void
 pool_cleanup()
 {
-    info("Freeing master pool");
-    free_pool(master_pool);
+    pthread_mutex_lock(&master_lock);
+    if (master_pool) {
+        info("Freeing master pool");
+        free_pool(master_pool);
+        master_pool = NULL;
+    }
+    pthread_mutex_unlock(&master_lock);
+}
+
+void
+pfree(POOL *pool, void *addr)
+{
+    struct memex_pool_t *p = (struct memex_pool_t*)pool;
+    if (p->state != MEMEX_STATE_VALID) {
+        if (p->state != MEMEX_STATE_FREED) {
+            error("%s:%d: Invalid Pool: (state = %d)", __FUNCTION__, __LINE__, p->state);
+        }
+        return;
+    }
+
+    pthread_mutex_lock(&p->lock);
+    uint32_t i;
+    for (i = 0; i < p->alloc_count; i++) {
+        struct alloc_info *info = p->allocs + i;
+        if (info->addr != addr) {
+            continue;
+        }
+
+        trace("%p: Data free (%p)", p, info->addr);
+        free(info->addr);
+        info->addr = NULL;
+        info->len = 0;
+    }
+    pthread_mutex_unlock(&p->lock);
 }
 
 void

@@ -48,6 +48,9 @@ $(LIB): $(SRC)
 memex-test: test/test.c $(SRC)
 	$(CC) $^ -ggdb $(INC) -o memex-test
 
+memex-thread-test: test/thread-test.c $(SRC)
+	$(CC) $^ -ggdb $(INC) -o memex-thread-test -lpthread
+
 install: $(LIB)
 	install -m 0755 $(LIB) -D $(DESTDIR)$(libdir)/$(LIBFILE)
 	cd $(DESTDIR)$(libdir); \
