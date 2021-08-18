@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdint.h>
+#include <pthread.h>
 #include <envex.h>
 
 #include "memex.h"
@@ -8,6 +9,8 @@
 #include "memex-log.h"
 
 #define DEFAULT_STEP_SIZE 0x10
+
+static pthread_mutex_t master_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static size_t memex_list_step_size = DEFAULT_STEP_SIZE;
 
@@ -27,6 +30,14 @@ struct memex_list_t {
     // Data buffer
     void *entries;
 
+    // Sort
+    enum memex_sort_type_e sort_type;
+    int sort_off;
+
+    pthread_mutex_t lock;
+    pthread_mutexattr_t attr;
+
+    int state;
     POOL *pool;
 };
 
@@ -39,6 +50,14 @@ memex_list_new_entry(MLIST *list)
         return NULL;
     }
     struct memex_list_t *m = (struct memex_list_t *)list;
+
+    if (m->state != MEMEX_STATE_VALID) {
+        if (m->state != MEMEX_STATE_FREED) {
+            error("%s:%d: Invalid MLIST: (state = %d)", __FUNCTION__, __LINE__, m->state);
+        }
+        return NULL;
+    }
+    pthread_mutex_lock(&m->lock);
 
     // Increment counter, manage list size, get last empty buffer
     size_t i = m->n_entry++;
@@ -53,6 +72,8 @@ memex_list_new_entry(MLIST *list)
     char *addr = (char *)m->entries;
     char *entry = addr + (i * m->entry_size);
     memset(entry, 0, m->entry_size);
+    pthread_mutex_unlock(&m->lock);
+
     return (void *)entry;
 }
 
@@ -67,7 +88,16 @@ memex_list_get_entries(MLIST *list, uint32_t *n_entries)
     }
     struct memex_list_t *m = (struct memex_list_t *)list;
 
+    if (m->state != MEMEX_STATE_VALID) {
+        if (m->state != MEMEX_STATE_FREED) {
+            error("%s:%d: Invalid MLIST: (state = %d)", __FUNCTION__, __LINE__, m->state);
+        }
+        return NULL;
+    }
+    pthread_mutex_lock(&m->lock);
     *n_entries = m->n_entry;
+    pthread_mutex_unlock(&m->lock);
+
     return m->entries;
 }
 
@@ -82,11 +112,20 @@ memex_list_get_entries_copy(MLIST *list, uint32_t *n_entries)
     }
     struct memex_list_t *m = (struct memex_list_t *)list;
 
+    if (m->state != MEMEX_STATE_VALID) {
+        if (m->state != MEMEX_STATE_FREED) {
+            error("%s:%d: Invalid MLIST: (state = %d)", __FUNCTION__, __LINE__, m->state);
+        }
+        return NULL;
+    }
+    pthread_mutex_lock(&m->lock);
     size_t bytes = m->entry_size * m->n_entry;
     void *copy = pcalloc(m->pool, bytes);
     memcpy(copy, m->entries, bytes);
 
     *n_entries = m->n_entry;
+    pthread_mutex_unlock(&m->lock);
+
     return copy;
 }
 
@@ -104,6 +143,11 @@ memex_list_create(POOL *pool, const size_t entry_size)
     m->pool = p;
     m->step = memex_list_step_size;
     m->entry_size = entry_size;
+
+    pthread_mutexattr_init(&m->attr);
+    pthread_mutexattr_settype(&m->attr, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(&m->lock, &m->attr);
+    m->state = MEMEX_STATE_VALID;
 
     trace("%p: created", m);
 
@@ -132,7 +176,16 @@ memex_list_clear(MLIST *list)
     }
 
     struct memex_list_t *m = (struct memex_list_t *)list;
+
+    if (m->state != MEMEX_STATE_VALID) {
+        if (m->state != MEMEX_STATE_FREED) {
+            error("%s:%d: Invalid MLIST: (state = %d)", __FUNCTION__, __LINE__, m->state);
+        }
+        return;
+    }
+    pthread_mutex_lock(&master_lock);
     m->n_entry = 0;
+    pthread_mutex_unlock(&master_lock);
 }
 
 void
@@ -145,10 +198,121 @@ memex_list_destroy(MLIST *list)
     }
 
     struct memex_list_t *m = (struct memex_list_t *)list;
+
+    pthread_mutex_lock(&m->lock);
+    m->state = MEMEX_STATE_FREED;
+    pthread_mutex_unlock(&m->lock);
+
+    pthread_mutex_lock(&m->lock);
     POOL *free_me = m->pool;
     free_pool(free_me);
+    pthread_mutex_unlock(&m->lock);
 
     trace("%p: destroyed", list);
+}
+
+void
+_memex_list_sort_set(MLIST *list, int offset, enum memex_sort_type_e type)
+{
+    // Dereference input pointer
+    if (!list) {
+        error("%s: Invalid MLIST", __FUNCTION__);
+        return;
+    }
+
+    struct memex_list_t *m = (struct memex_list_t *)list;
+    pthread_mutex_lock(&m->lock);
+    m->sort_off = offset;
+    m->sort_type = type;
+    pthread_mutex_unlock(&m->lock);
+}
+
+void
+memex_list_sort(MLIST *list)
+{
+    // Dereference input pointer
+    if (!list) {
+        error("%s: Invalid MLIST", __FUNCTION__);
+        return;
+    }
+
+    struct memex_list_t *m = (struct memex_list_t *)list;
+
+    if (m->state != MEMEX_STATE_VALID) {
+        if (m->state != MEMEX_STATE_FREED) {
+            error("%s:%d: Invalid MLIST: (state = %d)", __FUNCTION__, __LINE__, m->state);
+        }
+        return;
+    }
+    pthread_mutex_lock(&m->lock);
+
+    // Copy entries to char buffer
+    size_t bytes = m->entry_size * m->n_entry;
+    uint8_t *copy = pcalloc(m->pool, bytes);
+    memcpy(copy, m->entries, bytes);
+
+    bytes = m->size * sizeof(struct memex_sort_t);
+    struct memex_sort_t *sort = pcalloc(m->pool, bytes);
+
+    uint32_t N = m->n_entry;
+    for (int n = 0; n < N; n++) {
+        uint8_t *e = copy + (n * m->entry_size);
+        uint8_t *ptr = e + m->sort_off;
+        double val = 0;
+        switch (m->sort_type) {
+        case MEMEX_SORT_TYPE_DOUBLE:
+            val = *(double *)(ptr);
+            break;
+        case MEMEX_SORT_TYPE_FLOAT:
+            val = (double)(*(float *)(ptr));
+            break;
+        case MEMEX_SORT_TYPE_UINT64:
+            val = (double)(*(uint64_t *)(ptr));
+            break;
+        case MEMEX_SORT_TYPE_INT64:
+            val = (double)(*(int64_t *)(ptr));
+            break;
+        case MEMEX_SORT_TYPE_UINT32:
+            val = (double)(*(uint32_t *)(ptr));
+            break;
+        case MEMEX_SORT_TYPE_INT32:
+            val = (double)(*(int32_t *)(ptr));
+            break;
+        case MEMEX_SORT_TYPE_UINT16:
+            val = (double)(*(uint16_t *)(ptr));
+            break;
+        case MEMEX_SORT_TYPE_INT16:
+            val = (double)(*(int16_t *)(ptr));
+            break;
+        case MEMEX_SORT_TYPE_UINT8:
+            val = (double)(*(uint8_t *)(ptr));
+            break;
+        case MEMEX_SORT_TYPE_INT8:
+            val = (double)(*(int8_t *)(ptr));
+            break;
+        case MEMEX_SORT_TYPE_NOINIT:
+            error("Uninitialized sort type");
+            goto do_return;
+
+        default:
+            error("Invalid memex sort type: %d", m->sort_type);
+            goto do_return;
+        }
+
+        sort[n].ptr = e;
+        sort[n].val = val;
+    }
+
+    memex_merge_sort(sort, N);
+    for (int n = 0; n < N; n++) {
+        uint8_t *e = m->entries + (n * m->entry_size);
+        memcpy(e, sort[n].ptr, m->entry_size);
+    }
+
+do_return:
+    pfree(m->pool, copy);
+    pthread_mutex_unlock(&m->lock);
+    return;
 }
 
 void
@@ -161,8 +325,51 @@ memex_list_set_step_size(MLIST *list, size_t size)
 void
 memex_list_set_default_step_size(size_t size)
 {
+    pthread_mutex_lock(&master_lock);
     memex_list_step_size = size;
+    pthread_mutex_unlock(&master_lock);
+
     info("default step_size=%zd", size);
+}
+
+void
+memex_list_acquire(MLIST *list)
+{
+    // Dereference input pointer
+    if (!list) {
+        error("%s: Invalid MLIST", __FUNCTION__);
+        return;
+    }
+
+    struct memex_list_t *m = (struct memex_list_t *)list;
+
+    if (m->state != MEMEX_STATE_VALID) {
+        if (m->state != MEMEX_STATE_FREED) {
+            error("%s:%d: Invalid MLIST: (state = %d)", __FUNCTION__, __LINE__, m->state);
+        }
+        return;
+    }
+    pthread_mutex_lock(&m->lock);
+}
+
+void
+memex_list_release(MLIST *list)
+{
+    // Dereference input pointer
+    if (!list) {
+        error("%s: Invalid MLIST", __FUNCTION__);
+        return;
+    }
+
+    struct memex_list_t *m = (struct memex_list_t *)list;
+
+    if (m->state != MEMEX_STATE_VALID) {
+        if (m->state != MEMEX_STATE_FREED) {
+            error("%s:%d: Invalid MLIST: (state = %d)", __FUNCTION__, __LINE__, m->state);
+        }
+        return;
+    }
+    pthread_mutex_unlock(&m->lock);
 }
 
 void

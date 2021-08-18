@@ -31,8 +31,6 @@
 #include "memex-log.h"
 
 #define RADPOOL_ALLOC_INCREMENT 0x80
-#define MEMEX_STATE_VALID 0x10001000
-#define MEMEX_STATE_FREED 0x10101010
 
 static pthread_mutex_t master_lock = PTHREAD_MUTEX_INITIALIZER;
 
