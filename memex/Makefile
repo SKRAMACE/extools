@@ -27,6 +27,8 @@ VPATH = $(SRC_DIR)
 # Flags
 CFLAGS += -Werror -fPIC -shared
 LDFLAGS += -Wl,-soname,$(LIBFILE)
+TEST_CFLAGS=\
+    -ggdb \
 
 ifeq ($(debug),on)
 CFLAGS += -ggdb
@@ -42,14 +44,30 @@ SRC=\
 	sort.c \
 	cleanup.c
 
+TESTLIBS = \
+	-ltestex \
+    -lpthread \
+    -luuid \
+
+%.o: %.c
+	$(CC) $(LDFLAGS) $(CFLAGS) -c $^
+
 $(LIB): $(SRC)
 	$(CC) $^ $(INC) $(LDFLAGS) $(CFLAGS) -o $(LIB)
 
 memex-test: test/test.c $(SRC)
 	$(CC) $^ -ggdb $(INC) -o memex-test
 
-memex-thread-test: test/thread-test.c $(SRC)
-	$(CC) $^ -ggdb $(INC) -o memex-thread-test -lpthread
+memex-list-test: $(SRC)
+	$(CC) $(TEST_CFLAGS) test/list-test.c $^ $(INC) -o test/bin/$@ $(TESTLIBS)
+
+memex-pool-test: $(SRC)
+	$(CC) $(TEST_CFLAGS) test/pool-test.c $^ $(INC) -o test/bin/$@ $(TESTLIBS)
+
+memex-sort-test: $(SRC)
+	$(CC) $(TEST_CFLAGS) test/sort-test.c $^ $(INC) -o test/bin/$@ $(TESTLIBS)
+
+tests: memex-sort-test memex-pool-test memex-list-test
 
 install: $(LIB)
 	install -m 0755 $(LIB) -D $(DESTDIR)$(libdir)/$(LIBFILE)
@@ -71,3 +89,4 @@ endif
 clean:
 	rm -f $(LIB)*
 	rm -f *.o
+	rm -f test/bin/*
