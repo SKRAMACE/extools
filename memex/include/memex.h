@@ -33,6 +33,7 @@ void memex_cleanup_push_args(memex_cleanup_args_fn fn, void *args);
 typedef void MLIST;
 
 MLIST *memex_list_create(POOL *pool, const size_t entry_size);
+MLIST *memex_list_copy(POOL *pool, MLIST *list);
 void memex_list_clear(MLIST *list);
 void *memex_list_new_entry(MLIST *list);
 void *memex_list_get_entries(MLIST *list, uint32_t *n_entries);

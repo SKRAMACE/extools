@@ -154,6 +154,35 @@ memex_list_create(POOL *pool, const size_t entry_size)
     return (MLIST *)m;
 }
 
+MLIST *
+memex_list_copy(POOL *pool, MLIST *list)
+{
+    struct memex_list_t *m = (struct memex_list_t *)list;
+
+    if (m->state != MEMEX_STATE_VALID) {
+        if (m->state != MEMEX_STATE_FREED) {
+            error("%s:%d: Invalid MLIST: (state = %d)", __FUNCTION__, __LINE__, m->state);
+        }
+        return NULL;
+    }
+
+    pthread_mutex_lock(&m->lock);
+    struct memex_list_t *new = (struct memex_list_t *)memex_list_create(pool, (const size_t)m->entry_size);
+
+    new->size = m->size;
+
+    size_t bytes = m->size * m->entry_size;
+    new->entries = palloc(pool, bytes);
+    memcpy(new->entries, m->entries, bytes);
+    new->n_entry = m->n_entry;
+    new->sort_type = m->sort_type;
+    new->sort_off = m->sort_off;
+    new->state = m->state;
+    pthread_mutex_unlock(&m->lock);
+
+    return new;
+}
+
 POOL *
 memex_list_get_pool(MLIST *list) {
     // Dereference input pointer

@@ -61,6 +61,63 @@ basic_test()
     return TESTEX_SUCCESS;
 }
 
+static int
+copy_test()
+{
+    POOL *pool = create_pool();
+    MLIST *m0 = memex_list_create(pool, sizeof(int));
+
+    int N = 10;
+    for (int n = 0; n < N; n++) {
+        int *entry = memex_list_new_entry(m0);
+        *entry = n;
+    }
+
+    MLIST *m1 = memex_list_copy(pool, m0);
+
+    int N0, N1;
+    int *e0 = memex_list_get_entries(m0, &N0);
+    int *e1 = memex_list_get_entries(m1, &N1);
+
+    if (N != N1) {
+        verbose("Invalid number of entries (expected %d, got %d)", N, N1);
+        return TESTEX_FAILURE;
+    }
+        
+    if (N0 != N1) {
+        verbose("Copy error: Size mismatch");
+        return TESTEX_FAILURE;
+    }
+
+    if (e0 == e1) {
+        verbose("Copy error: buffers are the same");
+        return TESTEX_FAILURE;
+    }
+
+    for (int n = 0; n < N; n++) {
+        if (e0[n] != e1[n]) {
+            verbose("Copy error: value mismatch");
+            return TESTEX_FAILURE;
+        }
+    }
+
+    int *x = memex_list_new_entry(m1);
+    *x = 100;
+
+    e1 = memex_list_get_entries(m1, &N1);
+    if ((N + 1) != N1) {
+        verbose("Invalid number of entries (expected %d, got %d)", N + 1, N1);
+        return TESTEX_FAILURE;
+    }
+
+    if (e1[N1 - 1] != 100) {
+        verbose("Copy failed to function independently");
+        return TESTEX_FAILURE;
+    }
+
+    return TESTEX_SUCCESS;
+}
+
 static void *
 clear_list(void *args)
 {
@@ -129,6 +186,7 @@ main(int nargs, char *argv[])
     testex_setup();
 
     testex_add(basic_test);
+    testex_add(copy_test);
     testex_add(thread_test);
 
     testex_run();
