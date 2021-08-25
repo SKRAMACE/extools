@@ -118,6 +118,72 @@ copy_test()
     return TESTEX_SUCCESS;
 }
 
+static int
+remove_test()
+{
+    POOL *pool = create_pool();
+    MLIST *m = memex_list_create(pool, sizeof(int));
+
+    int N = 10;
+    for (int n = 0; n < N; n++) {
+        int *entry = memex_list_new_entry(m);
+        *entry = n;
+    }
+
+    memex_list_remove_index(m, 10);
+    int M;
+    int *entries = memex_list_get_entries(m, &M);
+    if (M != N) {
+        verbose("Invalid number of entries (expected %d, got %d)", N, M);
+        return TESTEX_FAILURE;
+    }
+
+    memex_list_remove_index(m, 9);
+    entries = memex_list_get_entries(m, &M);
+    if (M != N-1) {
+        verbose("Invalid number of entries (expected %d, got %d)", N-1, M);
+        return TESTEX_FAILURE;
+    }
+
+    memex_list_remove_index(m, 2);
+    entries = memex_list_get_entries(m, &M);
+    if (M != N-2) {
+        verbose("Invalid number of entries (expected %d, got %d)", N-2, M);
+        return TESTEX_FAILURE;
+    }
+
+    for (int n = 0; n < M; n++) {
+        if (entries[n] == 2) {
+            verbose("Failed to remove index 2");
+            return TESTEX_FAILURE;
+        }
+
+        if (entries[n] == 9) {
+            verbose("Failed to remove index 9");
+            return TESTEX_FAILURE;
+        }
+
+        entries[n] = n;
+    }
+
+    int A = 4;
+    memex_list_remove_after_index(m, A);
+    entries = memex_list_get_entries(m, &M);
+    if (M != 5) {
+        verbose("Invalid number of entries (expected %d, got %d)", A+1, M);
+        return TESTEX_FAILURE;
+    }
+
+    for (int n = 0; n < M; n++) {
+        if (entries[n] > A) {
+            verbose("\"Remove after\" failure");
+            return TESTEX_FAILURE;
+        }
+    }
+
+    return TESTEX_SUCCESS;
+}
+
 static void *
 clear_list(void *args)
 {
@@ -187,6 +253,7 @@ main(int nargs, char *argv[])
 
     testex_add(basic_test);
     testex_add(copy_test);
+    testex_add(remove_test);
     testex_add(thread_test);
 
     testex_run();

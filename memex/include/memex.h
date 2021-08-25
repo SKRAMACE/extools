@@ -35,6 +35,8 @@ typedef void MLIST;
 MLIST *memex_list_create(POOL *pool, const size_t entry_size);
 MLIST *memex_list_copy(POOL *pool, MLIST *list);
 void memex_list_clear(MLIST *list);
+void memex_list_remove_index(MLIST *list, uint32_t index);
+void memex_list_remove_after_index(MLIST *list, uint32_t index);
 void *memex_list_new_entry(MLIST *list);
 void *memex_list_get_entries(MLIST *list, uint32_t *n_entries);
 void *memex_list_get_entries_copy(MLIST *list, uint32_t *n_entries);

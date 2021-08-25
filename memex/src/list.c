@@ -212,9 +212,71 @@ memex_list_clear(MLIST *list)
         }
         return;
     }
-    pthread_mutex_lock(&master_lock);
+    pthread_mutex_lock(&m->lock);
     m->n_entry = 0;
-    pthread_mutex_unlock(&master_lock);
+    pthread_mutex_unlock(&m->lock);
+}
+
+void
+memex_list_remove_index(MLIST *list, uint32_t index)
+{
+    // Dereference input pointer
+    if (!list) {
+        error("%s: Invalid MLIST", __FUNCTION__);
+        return;
+    }
+
+    struct memex_list_t *m = (struct memex_list_t *)list;
+
+    if (m->state != MEMEX_STATE_VALID) {
+        if (m->state != MEMEX_STATE_FREED) {
+            error("%s:%d: Invalid MLIST: (state = %d)", __FUNCTION__, __LINE__, m->state);
+        }
+        return;
+    }
+
+    pthread_mutex_lock(&m->lock);
+    if (index >= m->n_entry) {
+        goto do_return;
+    }
+
+    if (index == (m->n_entry - 1)) {
+        goto dec_return;
+    }
+
+    char *dst = m->entries + (index * m->entry_size);
+    char *src = dst + m->entry_size;
+    size_t bytes = (m->n_entry - index + 1) * m->entry_size;
+    memcpy(dst, src, bytes);
+
+dec_return:
+    m->n_entry--;
+
+do_return:
+    pthread_mutex_unlock(&m->lock);
+}
+
+void
+memex_list_remove_after_index(MLIST *list, uint32_t index)
+{
+    // Dereference input pointer
+    if (!list) {
+        error("%s: Invalid MLIST", __FUNCTION__);
+        return;
+    }
+
+    struct memex_list_t *m = (struct memex_list_t *)list;
+
+    if (m->state != MEMEX_STATE_VALID) {
+        if (m->state != MEMEX_STATE_FREED) {
+            error("%s:%d: Invalid MLIST: (state = %d)", __FUNCTION__, __LINE__, m->state);
+        }
+        return;
+    }
+
+    pthread_mutex_lock(&m->lock);
+    m->n_entry = (index < (m->n_entry - 1)) ? index + 1 : m->n_entry;
+    pthread_mutex_unlock(&m->lock);
 }
 
 void
