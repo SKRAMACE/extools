@@ -226,6 +226,15 @@ add_subpool(POOL *pool, POOL *sub)
 }
 
 POOL *
+create_pool_unmanaged()
+{
+    info("Allocating unmanaged pool");
+    POOL *pool = malloc(sizeof(struct memex_pool_t));
+    init_pool(pool);
+    return pool;
+}
+
+POOL *
 create_pool()
 {
     // Logging init

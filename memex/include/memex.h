@@ -11,6 +11,7 @@ typedef void POOL;
 #define MEMEX_STATE_FREED 0x10101010
 
 POOL *create_pool();
+POOL *create_pool_unmanaged();
 POOL *create_subpool(POOL *pool);
 POOL *copy_pool(POOL *pool);
 void *palloc(POOL *pool, size_t bytes);

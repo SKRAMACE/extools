@@ -56,6 +56,70 @@ basic_test()
     return TESTEX_SUCCESS;
 }
 
+static int
+free_test()
+{
+    POOL *pool0 = create_pool();
+    POOL *pool1 = create_pool();
+    POOL *sub = create_subpool(pool0);
+
+    int N = 10;
+    char *x = palloc(pool0, N);
+    char *y = palloc(pool1, N);
+    if (!x || !y) {
+        verbose("alloc failure");
+        return TESTEX_FAILURE;
+    }
+
+    free_pool(pool0);
+    x = palloc(pool0, N);
+    if (x) {
+        verbose("alloc after free failure");
+        return TESTEX_FAILURE;
+    }
+
+    x = palloc(sub, N);
+    if (x) {
+        verbose("subpool alloc after parent freed failure");
+        return TESTEX_FAILURE;
+    }
+
+    y = palloc(pool1, N);
+    if (!y) {
+        verbose("pool exclusivity failure");
+        return TESTEX_FAILURE;
+    }
+
+    POOL *upool = create_pool_unmanaged();
+    x = palloc(upool, N);
+    if (!x) {
+        verbose("unmanaged pool alloc failure");
+        return TESTEX_FAILURE;
+    }
+
+    pool_cleanup();
+    x = palloc(pool1, 10);
+    y = palloc(upool, 10);
+    if (x) {
+        verbose("pool alloc after cleanup failure");
+        return TESTEX_FAILURE;
+    }
+
+    if (!y) {
+        verbose("unmanaged pool failure");
+        return TESTEX_FAILURE;
+    }
+
+    free_pool(upool);
+    y = palloc(upool, 10);
+    if (y) {
+        verbose("unmanaged pool alloc after free failure");
+        return TESTEX_FAILURE;
+    }
+
+    return TESTEX_SUCCESS;
+}
+
 static void *
 pool_worker(void *args)
 {
@@ -134,6 +198,7 @@ main(int nargs, char *argv[])
     testex_setup();
 
     testex_add(basic_test);
+    testex_add(free_test);
     testex_add(thread_test);
 
     testex_run();
