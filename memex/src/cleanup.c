@@ -31,12 +31,12 @@
 #define MAX_CLEANUP_FN 10
 
 static int cleanup_called = 0;
-static int n_cleanup_fn = 0;
 
-static struct memex_t {
+struct memex_t {
     void *fn;
     void *args;
-} stack[MAX_CLEANUP_FN];
+};
+static MLIST *stack = NULL;
 
 static void
 memex_cleanup_push_internal(void *fn, void *args)
@@ -47,14 +47,14 @@ memex_cleanup_push_internal(void *fn, void *args)
         memex_cleanup_set_log_level(lvl);
     }
 
-    if (n_cleanup_fn >= MAX_CLEANUP_FN) {
-        error("Max cleanup functions reached");
-        return;
+    if (!stack) {
+        POOL *pool = create_pool_unmanaged();
+        stack = memex_list_create(pool, sizeof(struct memex_t));
     }
 
-    int n = n_cleanup_fn++;
-    stack[n].fn = fn;
-    stack[n].args = args;
+    struct memex_t *e = memex_list_new_entry(stack);
+    e->fn = fn;
+    e->args = args;
 }
 
 void
@@ -72,21 +72,39 @@ memex_cleanup_push_args(memex_cleanup_args_fn fn, void *args)
 void
 memex_cleanup()
 {
+    // Quick return
     if (cleanup_called) {
         return;
     }
-    cleanup_called = 1;
 
-    int i = n_cleanup_fn - 1;
-    for (; i >= 0; i--) {
-        if (stack[i].args) {
-            memex_cleanup_args_fn fn = (memex_cleanup_args_fn)stack[i].fn;
-            fn(stack[i].args);
+    // Handle race condition
+    memex_list_acquire(stack);
+    if (cleanup_called) {
+        memex_list_release(stack);
+        return;
+    }
+    cleanup_called = 1;
+    memex_list_release(stack);
+
+    // Do actual cleanup
+    memex_list_acquire(stack);
+    uint32_t N;
+    struct memex_t *entries = memex_list_get_entries(stack, &N);
+    for (int i = N - 1; i >= 0; i--) {
+        struct memex_t *e = entries + i;
+        if (e->args) {
+            memex_cleanup_args_fn fn = (memex_cleanup_args_fn)e->fn;
+            fn(e->args);
         } else {
-            memex_cleanup_fn fn = (memex_cleanup_fn)stack[i].fn;
+            memex_cleanup_fn fn = (memex_cleanup_fn)e->fn;
             fn();
         }
     }
+    POOL *free_me = memex_list_get_pool(stack);
+    memex_list_release(stack);
+    memex_list_destroy(stack);
+
+    free_pool(free_me);
 }
 
 static void
