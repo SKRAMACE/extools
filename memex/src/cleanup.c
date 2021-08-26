@@ -111,6 +111,7 @@ static void
 memex_cleanup_and_exit()
 {
     memex_cleanup();
+    pool_cleanup();
     exit(0);
 }
 
