@@ -280,6 +280,37 @@ memex_list_remove_after_index(MLIST *list, uint32_t index)
 }
 
 void
+memex_list_remove_before_index(MLIST *list, uint32_t index)
+{
+    // Dereference input pointer
+    if (!list) {
+        error("%s: Invalid MLIST", __FUNCTION__);
+        return;
+    }
+
+    struct memex_list_t *m = (struct memex_list_t *)list;
+
+    if (m->state != MEMEX_STATE_VALID) {
+        if (m->state != MEMEX_STATE_FREED) {
+            error("%s:%d: Invalid MLIST: (state = %d)", __FUNCTION__, __LINE__, m->state);
+        }
+        return;
+    }
+
+    if (index == 0) {
+        return;
+    }
+
+    pthread_mutex_lock(&m->lock);
+    char *src = m->entries + (index * m->entry_size);
+    char *dst = m->entries;
+    size_t bytes = (m->n_entry - index) * m->entry_size;
+    memcpy(dst, src, bytes);
+    m->n_entry -= index;
+    pthread_mutex_unlock(&m->lock);
+}
+
+void
 memex_list_destroy(MLIST *list)
 {
     // Dereference input pointer

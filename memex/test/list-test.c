@@ -169,13 +169,29 @@ remove_test()
     int A = 4;
     memex_list_remove_after_index(m, A);
     entries = memex_list_get_entries(m, &M);
-    if (M != 5) {
+    if (M != A+1) {
         verbose("Invalid number of entries (expected %d, got %d)", A+1, M);
         return TESTEX_FAILURE;
     }
 
     for (int n = 0; n < M; n++) {
         if (entries[n] > A) {
+            verbose("\"Remove after\" failure");
+            return TESTEX_FAILURE;
+        }
+    }
+
+    N = M;
+    A = 3;
+    memex_list_remove_before_index(m, A);
+    entries = memex_list_get_entries(m, &M);
+    if (M != N-A) {
+        verbose("Invalid number of entries (expected %d, got %d)", N-A, M);
+        return TESTEX_FAILURE;
+    }
+
+    for (int n = 0; n < M; n++) {
+        if (entries[n] < A) {
             verbose("\"Remove after\" failure");
             return TESTEX_FAILURE;
         }
