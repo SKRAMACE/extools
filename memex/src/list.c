@@ -321,14 +321,22 @@ memex_list_destroy(MLIST *list)
 
     struct memex_list_t *m = (struct memex_list_t *)list;
 
+    if (m->state != MEMEX_STATE_VALID) {
+        if (m->state != MEMEX_STATE_FREED) {
+            error("%s:%d: Invalid MLIST: (state = %d)", __FUNCTION__, __LINE__, m->state);
+        }
+        return;
+    }
+
     pthread_mutex_lock(&m->lock);
     m->state = MEMEX_STATE_FREED;
     pthread_mutex_unlock(&m->lock);
 
     pthread_mutex_lock(&m->lock);
     POOL *free_me = m->pool;
-    free_pool(free_me);
     pthread_mutex_unlock(&m->lock);
+
+    free_pool(free_me);
 
     trace("%p: destroyed", list);
 }
