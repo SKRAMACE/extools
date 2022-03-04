@@ -23,6 +23,7 @@ struct test_t {
     double d;
     uint32_t u32;
     int32_t i32;
+    uint64_t u64;
 };
 
 static int
@@ -58,6 +59,7 @@ init_list(POOL *pool)
         t->f = rand_float();
         t->u32 = (uint32_t)rand_uint(128);
         t->i32 = rand_int(128);
+        t->u64 = (uint64_t)rand_uint(128);
     }
 
     return m;
@@ -152,6 +154,31 @@ do_return:
 }
 
 static int
+sort_test_uint64(MLIST *m)
+{
+    int ret = 1;
+    memex_list_sort_type(m, struct test_t, u64, MEMEX_SORT_TYPE_UINT64);
+
+    uint32_t N;
+    struct test_t *entries = memex_list_get_entries(m, &N);
+    for (int n = 0; n < N; n++) {
+        struct test_t *e = entries + n;
+        trace("[%d]: %d\n", e->ind, e->u64);
+        if (n == 0) {
+            continue;
+        }
+
+        if (entries[n - 1].u64 > entries[n].u64) {
+            goto do_return;
+        }
+    }
+    ret = 0;
+
+do_return:
+    return ret;
+}
+
+static int
 sort_test_uint(MLIST *m)
 {
     int ret = 1;
@@ -193,6 +220,11 @@ basic_test()
     }
 
     if (sort_test_uint(m) != 0) {
+        verbose("uint sort failed");
+        return TESTEX_FAILURE;
+    }
+
+    if (sort_test_uint64(m) != 0) {
         verbose("uint sort failed");
         return TESTEX_FAILURE;
     }

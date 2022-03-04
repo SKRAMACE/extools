@@ -72,7 +72,8 @@ enum memex_sort_type_e {
 
 struct memex_sort_t {
     void *ptr;
-    double val;
+    int64_t val;
+    int type;
 };
 
 #define memex_list_sort_set(list, _STRUCT_, _MEMBER_, type) \

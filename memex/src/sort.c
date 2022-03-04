@@ -18,6 +18,10 @@ memex_merge_sort(struct memex_sort_t *list, int len)
         return;
     }
 
+    if (list->type == MEMEX_SORT_TYPE_NOINIT) {
+        return;
+    }
+
     size_t bytes = len * sizeof(struct memex_sort_t);
     struct memex_sort_t *copy = malloc(bytes);
     for (int i = 0; i < len; i++) {
@@ -46,12 +50,34 @@ memex_merge_sort(struct memex_sort_t *list, int len)
             continue;
         }
 
-        if (b->val < a->val) {
-            *m++ = *b++;
-            blen--;
-        } else {
-            *m++ = *a++;
-            alen--;
+        // Handle unsigned 64-bit case
+        if (list->type == MEMEX_SORT_TYPE_UINT64) {
+            if ((uint64_t)b->val < (uint64_t)a->val) {
+                *m++ = *b++;
+                blen--;
+            } else {
+                *m++ = *a++;
+                alen--;
+            }
+
+        // Handle all other integers
+        } else if (list->type >= MEMEX_SORT_TYPE_INT64) {
+            if ((int64_t)b->val < (int64_t)a->val) {
+                *m++ = *b++;
+                blen--;
+            } else {
+                *m++ = *a++;
+                alen--;
+            }
+
+        } else if (list->type >= MEMEX_SORT_TYPE_DOUBLE) {
+            if ((int64_t)b->val < (int64_t)a->val) {
+                *m++ = *b++;
+                blen--;
+            } else {
+                *m++ = *a++;
+                alen--;
+            }
         }
     }
 

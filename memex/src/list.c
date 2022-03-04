@@ -388,37 +388,38 @@ memex_list_sort(MLIST *list)
     for (int n = 0; n < N; n++) {
         uint8_t *e = copy + (n * m->entry_size);
         uint8_t *ptr = e + m->sort_off;
-        double val = 0;
+        int64_t val = 0;
+        double *dval = (double *)&val;
         switch (m->sort_type) {
         case MEMEX_SORT_TYPE_DOUBLE:
-            val = *(double *)(ptr);
+            *dval = *(double *)(ptr);
             break;
         case MEMEX_SORT_TYPE_FLOAT:
-            val = (double)(*(float *)(ptr));
+            *dval = (double)(*(float *)(ptr));
             break;
         case MEMEX_SORT_TYPE_UINT64:
-            val = (double)(*(uint64_t *)(ptr));
+            val = *(uint64_t *)(ptr);
             break;
         case MEMEX_SORT_TYPE_INT64:
-            val = (double)(*(int64_t *)(ptr));
+            val = *(int64_t *)(ptr);
             break;
         case MEMEX_SORT_TYPE_UINT32:
-            val = (double)(*(uint32_t *)(ptr));
+            val = (int64_t)(*(uint32_t *)(ptr));
             break;
         case MEMEX_SORT_TYPE_INT32:
-            val = (double)(*(int32_t *)(ptr));
+            val = (int64_t)(*(int32_t *)(ptr));
             break;
         case MEMEX_SORT_TYPE_UINT16:
-            val = (double)(*(uint16_t *)(ptr));
+            val = (int64_t)(*(uint16_t *)(ptr));
             break;
         case MEMEX_SORT_TYPE_INT16:
-            val = (double)(*(int16_t *)(ptr));
+            val = (int64_t)(*(int16_t *)(ptr));
             break;
         case MEMEX_SORT_TYPE_UINT8:
-            val = (double)(*(uint8_t *)(ptr));
+            val = (int64_t)(*(uint8_t *)(ptr));
             break;
         case MEMEX_SORT_TYPE_INT8:
-            val = (double)(*(int8_t *)(ptr));
+            val = (int64_t)(*(int8_t *)(ptr));
             break;
         case MEMEX_SORT_TYPE_NOINIT:
             error("Uninitialized sort type");
@@ -430,6 +431,7 @@ memex_list_sort(MLIST *list)
         }
 
         sort[n].ptr = e;
+        sort[n].type = m->sort_type;
         sort[n].val = val;
     }
 
