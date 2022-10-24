@@ -14,6 +14,12 @@ static pthread_mutex_t master_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static size_t memex_list_step_size = DEFAULT_STEP_SIZE;
 
+enum memex_type_e {
+    MEMEX_TYPE_LIST=0,
+    MEMEX_TYPE_FIFO,
+    MEMEX_TYPE_STACK,
+};
+
 struct memex_list_t {
     // Number of new entries to allocate at a time
     uint32_t step;
@@ -38,6 +44,7 @@ struct memex_list_t {
     pthread_mutexattr_t attr;
 
     int state;
+    int type;
     POOL *pool;
 };
 
@@ -155,6 +162,22 @@ memex_list_create(POOL *pool, const size_t entry_size)
 }
 
 MLIST *
+memex_fifo_create(POOL *pool, const size_t entry_size)
+{
+    struct memex_list_t *m = (struct memex_list_t *)memex_list_create(pool, entry_size);
+    m->type = MEMEX_TYPE_FIFO;
+    return (MLIST *)m;
+}
+
+MLIST *
+memex_stack_create(POOL *pool, const size_t entry_size)
+{
+    struct memex_list_t *m = (struct memex_list_t *)memex_list_create(pool, entry_size);
+    m->type = MEMEX_TYPE_STACK;
+    return (MLIST *)m;
+}
+
+MLIST *
 memex_list_copy(POOL *pool, MLIST *list)
 {
     struct memex_list_t *m = (struct memex_list_t *)list;
@@ -248,6 +271,92 @@ memex_list_remove_index(MLIST *list, uint32_t index)
     char *src = dst + m->entry_size;
     size_t bytes = (m->n_entry - index + 1) * m->entry_size;
     memcpy(dst, src, bytes);
+
+dec_return:
+    m->n_entry--;
+
+do_return:
+    pthread_mutex_unlock(&m->lock);
+}
+
+int
+memex_list_push(MLIST *list, void *entry)
+{
+    int ret = 1;
+
+    if (!list) {
+        error("%s: Invalid MLIST", __FUNCTION__);
+        goto do_return;
+    }
+
+    // Dereference input pointer
+    struct memex_list_t *m = (struct memex_list_t *)list;
+    if (m->type != MEMEX_TYPE_FIFO && m->type != MEMEX_TYPE_STACK) {
+        error("%s: Can only push to type FIFO or STACK", __FUNCTION__);
+        goto do_return;
+    }
+
+    // Create new entry
+    void *new = memex_list_new_entry(list);
+    if (!new) {
+        goto do_return;
+    }
+
+    pthread_mutex_lock(&m->lock);
+    memcpy(new, entry, m->entry_size);
+    pthread_mutex_unlock(&m->lock);
+    ret = 0;
+
+do_return:
+    return ret;
+}
+
+int
+memex_list_pop(MLIST *list, void *entry)
+{
+    int ret = 1;
+    void *val = NULL;
+
+    if (!list) {
+        error("%s: Invalid MLIST", __FUNCTION__);
+        goto do_return;
+    }
+
+    // Dereference input pointer
+    struct memex_list_t *m = (struct memex_list_t *)list;
+    if (m->type != MEMEX_TYPE_FIFO && m->type != MEMEX_TYPE_STACK) {
+        error("%s: Can only pop from type FIFO or STACK", __FUNCTION__);
+        goto do_return;
+    }
+
+    // Hnadle race condition
+    if (m->state != MEMEX_STATE_VALID) {
+        if (m->state != MEMEX_STATE_FREED) {
+            error("%s:%d: Invalid MLIST: (state = %d)", __FUNCTION__, __LINE__, m->state);
+        }
+        goto do_return;
+    }
+
+    pthread_mutex_lock(&m->lock);
+    ret = 0;
+
+    if (m->n_entry == 0) {
+        goto do_return;
+    }
+
+    if (m->type == MEMEX_TYPE_FIFO) {
+        // Copy first entry
+        memcpy(entry, m->entries, m->entry_size);
+
+        // Overwrite first entry
+        size_t bytes = (m->n_entry - 1) * m->entry_size;
+        memcpy(m->entries, m->entries + m->entry_size, bytes);
+
+    } else if (m->type == MEMEX_TYPE_STACK) {
+        // Copy last entry
+        char *src = m->entries + ((m->n_entry - 1) * m->entry_size);
+        memcpy(entry, src, m->entry_size);
+    }
 
 dec_return:
     m->n_entry--;

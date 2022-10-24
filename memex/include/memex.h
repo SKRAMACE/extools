@@ -34,6 +34,8 @@ void memex_cleanup_push_args(memex_cleanup_args_fn fn, void *args);
 typedef void MLIST;
 
 MLIST *memex_list_create(POOL *pool, const size_t entry_size);
+MLIST *memex_fifo_create(POOL *pool, const size_t entry_size);
+MLIST *memex_stack_create(POOL *pool, const size_t entry_size);
 MLIST *memex_list_copy(POOL *pool, MLIST *list);
 void memex_list_clear(MLIST *list);
 void memex_list_remove_index(MLIST *list, uint32_t index);
@@ -47,6 +49,8 @@ void memex_list_destroy(MLIST *list);
 POOL *memex_list_get_pool(MLIST *list);
 void memex_list_acquire(MLIST *list);
 void memex_list_release(MLIST *list);
+int memex_list_push(MLIST *list, void *entry);
+int memex_list_pop(MLIST *list, void *entry);
 
 void memex_list_set_default_step_size(size_t size);
 

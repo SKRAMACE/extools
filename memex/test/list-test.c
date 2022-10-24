@@ -261,9 +261,54 @@ thread_test()
     return TESTEX_SUCCESS;
 }
 
+static int
+fifo_stack_test()
+{
+    int ret = TESTEX_FAILURE;
+    POOL *pool = create_pool();
+    MLIST *m = memex_list_create(pool, sizeof(int));
+
+    int i = 0;
+    ASSERT_FAILURE(memex_list_push(m, &i));
+    ASSERT_FAILURE(memex_list_pop(m, &i));
+
+    MLIST *f = memex_fifo_create(pool, sizeof(int));
+    MLIST *s = memex_stack_create(pool, sizeof(int));
+    for (int i = 0; i < 5; i++) {
+        memex_list_push(f, &i);
+        memex_list_push(s, &i);
+    }
+
+    uint32_t N;
+    memex_list_get_entries(f, &N);
+    ASSERT_EQUAL(N, 5);
+
+    memex_list_get_entries(s, &N);
+    ASSERT_EQUAL(N, 5);
+
+    for (int i = 0; i < 5; i++) {
+        int ii = 5 - i - 1;
+        int vf, vs;
+        memex_list_pop(f, &vf);
+        memex_list_pop(s, &vs);
+
+        ASSERT_EQUAL(i, vf);
+        ASSERT_EQUAL(ii, vs);
+    }
+
+    memex_list_get_entries(f, &N);
+    ASSERT_EQUAL(N, 0);
+
+    ret = TESTEX_SUCCESS;
+
+testex_return:
+    return ret;
+}
+
 int
 main(int nargs, char *argv[])
 {
+    memex_list_set_log_level("critical");
     TESTEX_LOG_INIT("info");
     testex_setup();
 
@@ -271,6 +316,7 @@ main(int nargs, char *argv[])
     testex_add(copy_test);
     testex_add(remove_test);
     testex_add(thread_test);
+    testex_add(fifo_stack_test);
 
     testex_run();
     testex_cleanup();
