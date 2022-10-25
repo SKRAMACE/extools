@@ -312,10 +312,13 @@ do_return:
 }
 
 int
-memex_list_pop(MLIST *list, void *entry)
+memex_list_pop(MLIST *list, void *entry, uint32_t *n_entries)
 {
     int ret = 1;
     void *val = NULL;
+    if (n_entries) {
+        *n_entries = 0;
+    }
 
     if (!list) {
         error("%s: Invalid MLIST", __FUNCTION__);
@@ -344,6 +347,9 @@ memex_list_pop(MLIST *list, void *entry)
         goto do_return;
     }
 
+    if (n_entries) {
+        *n_entries = 1;
+    }
     if (m->type == MEMEX_TYPE_FIFO) {
         // Copy first entry
         memcpy(entry, m->entries, m->entry_size);

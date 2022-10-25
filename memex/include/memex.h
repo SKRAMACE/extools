@@ -50,7 +50,7 @@ POOL *memex_list_get_pool(MLIST *list);
 void memex_list_acquire(MLIST *list);
 void memex_list_release(MLIST *list);
 int memex_list_push(MLIST *list, void *entry);
-int memex_list_pop(MLIST *list, void *entry);
+int memex_list_pop(MLIST *list, void *entry, uint32_t *n_entries);
 
 void memex_list_set_default_step_size(size_t size);
 

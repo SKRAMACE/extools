@@ -270,7 +270,7 @@ fifo_stack_test()
 
     int i = 0;
     ASSERT_FAILURE(memex_list_push(m, &i));
-    ASSERT_FAILURE(memex_list_pop(m, &i));
+    ASSERT_FAILURE(memex_list_pop(m, &i, NULL));
 
     MLIST *f = memex_fifo_create(pool, sizeof(int));
     MLIST *s = memex_stack_create(pool, sizeof(int));
@@ -289,14 +289,21 @@ fifo_stack_test()
     for (int i = 0; i < 5; i++) {
         int ii = 5 - i - 1;
         int vf, vs;
-        memex_list_pop(f, &vf);
-        memex_list_pop(s, &vs);
+        memex_list_pop(f, &vf, NULL);
+        memex_list_pop(s, &vs, NULL);
 
         ASSERT_EQUAL(i, vf);
         ASSERT_EQUAL(ii, vs);
     }
 
     memex_list_get_entries(f, &N);
+    ASSERT_EQUAL(N, 0);
+
+    int x = 1;
+    memex_list_push(f, &x);
+    memex_list_pop(f, &x, &N);
+    ASSERT_EQUAL(N, 1);
+    ASSERT_SUCCESS(memex_list_pop(f, &x, &N));
     ASSERT_EQUAL(N, 0);
 
     ret = TESTEX_SUCCESS;
