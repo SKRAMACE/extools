@@ -77,6 +77,11 @@ memex_cleanup()
         return;
     }
 
+    if (!stack) {
+        cleanup_called = 1;
+        return;
+    }
+
     // Handle race condition
     memex_list_acquire(stack);
     if (cleanup_called) {
