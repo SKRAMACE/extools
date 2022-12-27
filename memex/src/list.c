@@ -297,12 +297,12 @@ memex_list_push(MLIST *list, void *entry)
     }
 
     // Create new entry
+    pthread_mutex_lock(&m->lock);
     void *new = memex_list_new_entry(list);
     if (!new) {
         goto do_return;
     }
 
-    pthread_mutex_lock(&m->lock);
     memcpy(new, entry, m->entry_size);
     pthread_mutex_unlock(&m->lock);
     ret = 0;
@@ -364,7 +364,6 @@ memex_list_pop(MLIST *list, void *entry, uint32_t *n_entries)
         memcpy(entry, src, m->entry_size);
     }
 
-dec_return:
     m->n_entry--;
 
 do_return:
